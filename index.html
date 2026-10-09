@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Comercial</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23000'/%3E%3Ctext x='16' y='22' font-family='Arial' font-weight='700' font-size='17' fill='%232997ff' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="comum.css">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="comum.js"></script>
+<style>
+.topo{padding:48px 0 8px}
+.topo .linha{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.periodo{display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:100%;min-width:0}
+.topo .linha>*{min-width:0;max-width:100%}
+.periodo .datas{display:flex;gap:6px;align-items:center}
+.periodo .datas .in{height:32px;width:auto;font-size:13px;padding:0 10px;border-radius:980px}
+
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin:32px 0 28px}
+.kpi{padding:18px 18px 16px}
+.kpi .v{font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1.1;margin-top:6px}
+.kpi .s{font-size:12px;color:var(--text-3);margin-top:4px;letter-spacing:0}
+.kpi.destaque .v{color:var(--ok)}
+@media (max-width:980px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:560px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.kpi .v{font-size:23px}}
+
+.ferramentas{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.filtros{display:flex;gap:6px;overflow-x:auto;max-width:100%;scrollbar-width:none}
+.filtros::-webkit-scrollbar{display:none}
+.filtro{height:32px;padding:0 14px;border-radius:980px;border:1px solid var(--border);background:transparent;color:var(--text-2);font-size:13px;cursor:pointer;white-space:nowrap;transition:all .2s var(--ease)}
+.filtro b{font-weight:600;margin-left:5px;color:var(--text-3)}
+.filtro.on{background:var(--text);border-color:var(--text);color:var(--bg);font-weight:600}
+.filtro.on b{color:var(--bg);opacity:.6}
+.busca{flex:1;min-width:200px}
+.busca .in{height:36px;border-radius:980px;font-size:14px}
+
+.lista{overflow:hidden}
+.linha-l{display:grid;grid-template-columns:minmax(170px,1.3fr) minmax(140px,1.1fr) 110px 130px 100px 330px;gap:14px;align-items:center;padding:16px 20px;border-top:1px solid var(--border);transition:background .15s}
+.linha-l:first-child{border-top:0}
+.linha-l:not(.cab):hover{background:var(--neutral-soft)}
+.linha-l.cab{padding-top:11px;padding-bottom:11px;font-size:12px;color:var(--text-3);letter-spacing:0}
+.linha-l.realce{background:var(--accent-soft)}
+.quem .n{font-weight:600;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.quem .t,.oque .t{font-size:13px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:-.01em}
+.quem .o{font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.oque .c{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nota .c{font-size:14px}.nota .s{font-size:12px;color:var(--text-3)}
+.valor .v{font-weight:600}.valor .s{font-size:12px;color:var(--text-3);letter-spacing:0}
+.acoes{display:flex;gap:4px;justify-content:flex-end;flex-wrap:nowrap}
+.acoes .btn.quiet{padding:0 9px}
+.vazio{padding:56px 20px;text-align:center;color:var(--text-2)}
+@media (max-width:900px){
+  .linha-l.cab{display:none}
+  .linha-l{grid-template-columns:1fr auto;grid-template-areas:"quem st" "oque oque" "nota valor" "acoes acoes";row-gap:10px;padding:16px}
+  .quem{grid-area:quem}.st{grid-area:st;justify-self:end}.oque{grid-area:oque}.nota{grid-area:nota}.valor{grid-area:valor;justify-self:end;text-align:right}.acoes{grid-area:acoes;justify-content:flex-start;flex-wrap:wrap}
+}
+.rodape{color:var(--text-3);font-size:12px;letter-spacing:0;margin:18px 2px 48px;line-height:1.6}
+
+.gaveta .cab-g{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.gaveta .cab-g .ttl{margin-right:auto;min-width:0}
+.gaveta .cab-g .ttl b{display:block;font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gaveta .cab-g .ttl span{font-size:13px;color:var(--text-2)}
+.gaveta .corpo{flex:1;overflow:auto;padding:16px 18px;background:var(--bg)}
+.msg{max-width:84%;margin:6px 0;padding:9px 13px;border-radius:18px;font-size:15px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word;letter-spacing:-.01em}
+.msg .h{display:block;font-size:11px;color:var(--text-3);margin-top:3px;letter-spacing:0}
+.msg.lead{background:var(--elevated);border:1px solid var(--border);border-bottom-left-radius:6px}
+.msg.bot,.msg.followup,.msg.sistema{background:var(--accent-soft);margin-left:auto;border-bottom-right-radius:6px}
+.msg.humano{background:var(--ok-soft);margin-left:auto;border-bottom-right-radius:6px}
+.legenda{display:flex;gap:14px;font-size:12px;color:var(--text-2);padding:10px 18px;border-top:1px solid var(--border);letter-spacing:0}
+.ponto{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+</style>
+</head>
+<body>
+<main id="app" class="hidden">
+  <div class="wrap">
+    <section class="topo">
+      <div class="eyebrow" id="sobre">Comercial</div>
+      <div class="linha">
+        <h1 class="display" id="titulo">Carregando…</h1>
+        <div class="periodo">
+          <div class="seg" id="periodos">
+            <button data-p="hoje">Hoje</button><button data-p="7d">7 dias</button><button data-p="mes">Este mês</button><button data-p="mesant">Mês passado</button><button data-p="custom">Período</button>
+          </div>
+          <div class="datas hidden" id="datas"><input type="date" class="in" id="d-de"><span class="caption">até</span><input type="date" class="in" id="d-ate"><button class="btn sm" id="d-ok">Aplicar</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="kpis" id="kpis"></section>
+
+    <section class="ferramentas">
+      <div class="filtros" id="filtros"></div>
+      <div class="busca"><input class="in" id="busca" placeholder="Buscar nome, telefone, carro ou bairro" aria-label="Buscar"></div>
+      <button class="btn sm" id="b-csv">Exportar CSV</button>
+      <button class="btn sm quiet" id="b-atual">Atualizar</button>
+    </section>
+
+    <section class="card lista" id="lista"></section>
+    <p class="rodape">Marque <b>Vendido</b> com o valor assim que a venda fechar. Venda de lead que veio do Google Ads volta pro Google sozinha no dia seguinte, e é isso que ensina o Google a trazer mais cliente que compra.</p>
+  </div>
+</main>
+<div id="raiz-modal"></div>
+
+<script>
+const { $, esc, brl, int, pct, dataHora, fone, STATUS, CANAL, periodo, MESES, guarda, toast } = Painel;
+let sb, leads = [], filtro = 'todos', chave = guarda.ler('periodo-crm', 'hoje'), faixa;
+const alvoInicial = new URLSearchParams(location.search).get('lead');
+
+function setPeriodo(p) {
+  chave = p; guarda.gravar('periodo-crm', p);
+  document.querySelectorAll('#periodos button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
+  $('#datas').classList.toggle('hidden', p !== 'custom');
+  if (p === 'custom' && !$('#d-de').value) { const n = new Date(); $('#d-de').value = new Date(n.getFullYear(), n.getMonth(), 1).toISOString().slice(0, 10); $('#d-ate').value = n.toISOString().slice(0, 10); }
+  carregar();
+}
+
+async function carregar() {
+  faixa = periodo(chave, $('#d-de').value, $('#d-ate').value);
+  const rotulo = { hoje: 'Hoje', '7d': 'Últimos 7 dias', mes: MESES[faixa[0].getMonth()], mesant: MESES[faixa[0].getMonth()], custom: 'Período' }[chave];
+  $('#sobre').textContent = 'Comercial · ' + rotulo;
+  $('#lista').innerHTML = '<div class="vazio">Carregando…</div>';
+  const { data, error } = await sb.rpc('painel_leads', { p_de: faixa[0].toISOString(), p_ate: faixa[1].toISOString() });
+  if (error) { $('#lista').innerHTML = `<div class="vazio">Não consegui carregar: ${esc(error.message)}</div>`; return; }
+  leads = data || [];
+  render();
+  if (alvoInicial && !carregar._abriu) {
+    carregar._abriu = true;
+    if (leads.some(l => l.telefone === alvoInicial)) { $('#busca').value = alvoInicial; render(); conversa(alvoInicial); }
+    else toast('Esse lead não está no período selecionado.');
+  }
+}
+
+function render() {
+  const total = leads.length, ganhos = leads.filter(l => l.status === 'vendido');
+  const receita = ganhos.reduce((s, l) => s + Number(l.venda_valor || 0), 0);
+  const google = leads.filter(l => l.canal === 'google');
+  const abertos = leads.filter(l => l.status === 'atendimento' || l.status === 'triagem').length;
+  $('#titulo').textContent = total ? `${int(total)} leads. ${int(ganhos.length)} ${ganhos.length === 1 ? 'venda' : 'vendas'}.` : 'Nenhum lead ainda.';
+  $('#kpis').innerHTML = [
+    ['Leads', int(total), int(google.length) + ' do Google Ads'],
+    ['Em aberto', int(abertos), 'sem venda marcada'],
+    ['Vendas', int(ganhos.length), pct(ganhos.length, total, 1) + ' de conversão'],
+    ['Receita', brl(receita), 'no período', 'destaque'],
+    ['Ticket médio', ganhos.length ? brl(receita / ganhos.length) : '—', int(ganhos.length) + ' venda(s)'],
+    ['Vendas do Google', int(ganhos.filter(l => l.canal === 'google').length), brl(ganhos.filter(l => l.canal === 'google').reduce((s, l) => s + Number(l.venda_valor || 0), 0))]
+  ].map(([l, v, s, c]) => `<div class="card kpi ${c || ''}"><div class="caption">${l}</div><div class="v num">${v}</div><div class="s">${s}</div></div>`).join('');
+
+  const cont = { todos: total }; leads.forEach(l => cont[l.status] = (cont[l.status] || 0) + 1);
+  $('#filtros').innerHTML = ['todos', 'triagem', 'atendimento', 'vendido', 'perdido']
+    .map(k => `<button class="filtro ${filtro === k ? 'on' : ''}" data-f="${k}">${k === 'todos' ? 'Todos' : STATUS[k]}<b>${cont[k] || 0}</b></button>`).join('');
+
+  const q = $('#busca').value.trim().toLowerCase();
+  const vis = leads.filter(l => (filtro === 'todos' || l.status === filtro) &&
+    (!q || [l.nome, l.telefone, l.carro, l.bairro, fone(l.telefone)].some(x => String(x || '').toLowerCase().includes(q))));
+  if (!vis.length) { $('#lista').innerHTML = `<div class="vazio">${total ? 'Nenhum lead com esse filtro.' : 'Nenhum lead nesse período.'}</div>`; return; }
+
+  $('#lista').innerHTML = `<div class="linha-l cab"><div>Lead</div><div>Carro e bairro</div><div>Origem</div><div>Status</div><div>Valor</div><div></div></div>` + vis.map(l => {
+    const valor = l.status === 'vendido'
+      ? `<div class="v num">${brl(l.venda_valor, 2)}</div><div class="s">${l.tem_gclid ? 'vai pro Google' : 'sem clique do Google'}</div>`
+      : '<span class="s">—</span>';
+    const fechado = l.status === 'vendido' || l.status === 'perdido';
+    const acoes = fechado
+      ? `<button class="btn sm" data-a="reabrir" data-t="${esc(l.telefone)}">Reabrir</button>`
+      : `<button class="btn sm ganho" data-a="ganho" data-t="${esc(l.telefone)}">Vendido</button><button class="btn sm perdido" data-a="perdido" data-t="${esc(l.telefone)}">Perdido</button>`;
+    return `<div class="linha-l ${l.telefone === alvoInicial ? 'realce' : ''}">
+      <div class="quem"><div class="n">${esc(l.nome || 'Sem nome')}</div><div class="t num">${esc(fone(l.telefone))} · ${dataHora(l.chegou_em)}</div></div>
+      <div class="oque"><div class="c">${esc(l.carro || 'Carro não informado')}</div><div class="t">${esc(l.bairro || 'Bairro não informado')}</div></div>
+      <div class="nota"><div class="c">${esc(CANAL[l.canal] || l.canal)}</div><div class="s">${l.tem_gclid ? 'clique rastreado' : ''}</div></div>
+      <div class="st"><span class="pill p-${l.status}">${STATUS[l.status]}</span></div>
+      <div class="valor">${valor}</div>
+      <div class="acoes">${acoes}<button class="btn sm quiet" data-a="conversa" data-t="${esc(l.telefone)}">Conversa</button><a class="btn sm quiet" href="https://wa.me/${esc(l.telefone)}" target="_blank" rel="noopener">WhatsApp</a></div>
+    </div>`;
+  }).join('');
+}
+
+/* ---------- ações ---------- */
+const modal = (html) => { $('#raiz-modal').innerHTML = `<div class="veu" id="veu">${html}</div>`; $('#veu').addEventListener('click', e => { if (e.target.id === 'veu') fechar(); }); };
+const fechar = () => { $('#raiz-modal').innerHTML = ''; };
+const lead = (t) => leads.find(x => x.telefone === t) || {};
+
+function ganho(t) {
+  const l = lead(t), hoje = new Date().toISOString().slice(0, 10);
+  modal(`<div class="modal"><h3>Marcar como vendido</h3><div class="sub">${esc(l.nome || fone(t))}${l.carro ? ' · ' + esc(l.carro) : ''}</div>
+    <label class="l" for="m-valor">Valor da venda</label><input id="m-valor" class="in num" inputmode="decimal" placeholder="R$ 650,00" value="">
+    <label class="l" for="m-data">Data da venda</label><input id="m-data" class="in" type="date" value="${hoje}" max="${hoje}">
+    <label class="l" for="m-obs">O que foi vendido (opcional)</label><textarea id="m-obs" class="in" placeholder="Moura 60Ah"></textarea>
+    <div class="erro" id="m-erro"></div>
+    <div class="pe"><button class="btn quiet" id="m-x">Cancelar</button><button class="btn primary" id="m-ok">Salvar venda</button></div></div>`);
+  $('#m-x').onclick = fechar; setTimeout(() => $('#m-valor').focus(), 60);
+  $('#m-ok').onclick = () => {
+    const raw = $('#m-valor').value.trim().replace(/[R$\s]/g, '');
+    const v = Number(raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw.replace(/\.(?=\d{3}(\D|$))/g, ''));
+    if (!v || v <= 0) { $('#m-erro').textContent = 'Informe o valor da venda.'; return; }
+    executar({ p_telefone: t, p_acao: 'vendido', p_valor: v, p_data: $('#m-data').value || null, p_motivo: $('#m-obs').value.trim() || null }, 'Venda registrada');
+  };
+}
+function perdido(t) {
+  const l = lead(t);
+  modal(`<div class="modal"><h3>Marcar como perdido</h3><div class="sub">${esc(l.nome || fone(t))}</div>
+    <label class="l" for="m-mot">Motivo</label>
+    <select id="m-mot" class="in"><option value="">Sem motivo</option><option>Achou caro</option><option>Fechou com concorrente</option><option>Desistiu ou parou de responder</option><option>Fora da área de entrega</option><option>Não tinha a bateria</option><option>Só pesquisando preço</option><option>Outro</option></select>
+    <div class="erro" id="m-erro"></div>
+    <div class="pe"><button class="btn quiet" id="m-x">Cancelar</button><button class="btn primary" id="m-ok">Salvar</button></div></div>`);
+  $('#m-x').onclick = fechar;
+  $('#m-ok').onclick = () => executar({ p_telefone: t, p_acao: 'perdido', p_motivo: $('#m-mot').value || null }, 'Marcado como perdido');
+}
+const reabrir = (t) => executar({ p_telefone: t, p_acao: 'reabrir' }, 'Lead reaberto');
+
+async function executar(args, msg) {
+  const b = $('#m-ok'); if (b) b.disabled = true;
+  const { error } = await sb.rpc('painel_marcar', args);
+  if (error) { if ($('#m-erro')) { $('#m-erro').textContent = error.message; b.disabled = false; } else toast(error.message); return; }
+  fechar(); toast(msg); carregar();
+}
+
+async function conversa(t) {
+  const l = lead(t);
+  $('#raiz-modal').innerHTML = `<div class="veu" id="veu" style="justify-content:flex-end;padding:0"></div><aside class="gaveta">
+    <div class="cab-g"><div class="ttl"><b>${esc(l.nome || 'Sem nome')}</b><span class="num">${esc(fone(t))} · ${STATUS[l.status] || ''}</span></div>
+    <a class="btn sm" href="https://wa.me/${esc(t)}" target="_blank" rel="noopener">WhatsApp</a><button class="btn sm quiet" id="g-x">Fechar</button></div>
+    <div class="corpo" id="g-corpo"><div class="vazio">Carregando…</div></div>
+    <div class="legenda"><span><i class="ponto" style="background:var(--text-3)"></i>Cliente</span><span><i class="ponto" style="background:var(--accent)"></i>Bot</span><span><i class="ponto" style="background:var(--ok)"></i>Equipe</span></div></aside>`;
+  $('#veu').onclick = fechar; $('#g-x').onclick = fechar;
+  const { data, error } = await sb.rpc('painel_conversa', { p_telefone: t });
+  if (error) { $('#g-corpo').innerHTML = `<div class="vazio">${esc(error.message)}</div>`; return; }
+  $('#g-corpo').innerHTML = (data || []).length
+    ? data.map(m => `<div class="msg ${esc(m.direcao)}">${esc(m.conteudo || '[' + m.tipo + ']')}<span class="h">${dataHora(m.created_at)}</span></div>`).join('')
+    : '<div class="vazio">Sem mensagens registradas.</div>';
+  $('#g-corpo').scrollTop = $('#g-corpo').scrollHeight;
+}
+
+function csv() {
+  const cols = [['chegou_em', 'Chegou em'], ['nome', 'Nome'], ['telefone', 'Telefone'], ['status', 'Status'], ['carro', 'Carro'], ['bairro', 'Bairro'], ['canal', 'Origem'], ['tem_gclid', 'Clique do Google'], ['venda_valor', 'Venda'], ['venda_at', 'Data da venda'], ['desfecho_motivo', 'Motivo / observação'], ['desfecho_por', 'Marcado por']];
+  const linhas = [cols.map(c => c[1]).join(';')].concat(leads.map(l => cols.map(([k]) => {
+    let v = l[k]; if (k === 'status') v = STATUS[v]; if (k === 'canal') v = CANAL[v] || v; if (k === 'tem_gclid') v = v ? 'sim' : 'não';
+    if ((/_at$/.test(k) || k === 'chegou_em') && v) v = new Date(v).toLocaleString('pt-BR');
+    if (typeof v === 'number') v = String(v).replace('.', ',');
+    return '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  }).join(';')));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + linhas.join('\n')], { type: 'text/csv;charset=utf-8' }));
+  a.download = `leads-${faixa[0].toISOString().slice(0, 10)}.csv`; a.click();
+}
+
+Painel.iniciar('crm', (cliente) => {
+  sb = cliente;
+  $('#periodos').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setPeriodo(b.dataset.p); });
+  $('#d-ok').onclick = carregar;
+  $('#filtros').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) { filtro = b.dataset.f; render(); } });
+  $('#busca').addEventListener('input', render);
+  $('#b-atual').onclick = carregar; $('#b-csv').onclick = csv;
+  $('#lista').addEventListener('click', e => {
+    const b = e.target.closest('[data-a]'); if (!b) return;
+    ({ ganho, perdido, reabrir, conversa })[b.dataset.a](b.dataset.t);
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') fechar(); });
+  setPeriodo(chave);
+});
+</script>
+</body>
+</html>

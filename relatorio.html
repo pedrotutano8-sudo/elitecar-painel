@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Relatório</title>
+<link rel="stylesheet" href="comum.css">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="comum.js"></script>
+<style>
+.hero{padding:88px 0 56px}
+.hero .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:28px}
+.hero .controle{margin-top:28px}
+section.bloco{padding:72px 0;border-top:1px solid var(--border)}
+.bloco .lede{margin-bottom:36px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.stat{padding:24px 22px}
+.stat .v{font-size:clamp(34px,4.4vw,48px);font-weight:700;letter-spacing:-.03em;line-height:1.05}
+.stat .r{font-size:15px;color:var(--text);margin-top:8px}
+.stat .c{font-size:13px;color:var(--text-3);margin-top:4px;letter-spacing:-.005em}
+.stat .c .melhor{color:var(--ok)}.stat .c .pior{color:var(--bad)}
+@media (max-width:900px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:480px){.stats{gap:10px}.stat{padding:18px 16px}}
+
+/* barras horizontais (funil, situações) — uma cor só: magnitude */
+.barras{padding:8px 24px 20px}
+.barra{display:grid;grid-template-columns:minmax(120px,220px) 1fr 88px;gap:16px;align-items:center;padding:12px 0;border-top:1px solid var(--border)}
+.barra:first-child{border-top:0}
+.barra .nome{font-size:15px}
+.barra .trilho{height:10px;background:var(--neutral-soft);border-radius:980px;overflow:hidden}
+.barra .preench{height:100%;background:var(--accent);border-radius:980px;min-width:4px;transition:width .6s var(--ease)}
+.barra .num{text-align:right;font-size:15px;font-weight:600}
+.barra .num small{display:block;font-size:12px;font-weight:400;color:var(--text-3)}
+@media (max-width:560px){.barra{grid-template-columns:1fr 70px;grid-template-areas:"n v" "t t";row-gap:8px}.barra .nome{grid-area:n}.barra .trilho{grid-area:t}.barra .num{grid-area:v}}
+
+/* colunas por dia */
+.colunas{display:flex;align-items:flex-end;gap:3px;height:180px;padding:24px 24px 0}
+.coluna{flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;cursor:default;position:relative}
+.coluna .b{background:var(--accent);border-radius:4px 4px 0 0;min-height:2px;transition:opacity .15s}
+.coluna:hover .b{opacity:.75}
+.coluna .venda{position:absolute;left:50%;transform:translateX(-50%);width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 2px var(--surface)}
+.eixo{display:flex;justify-content:space-between;padding:8px 24px 18px;border-top:1px solid var(--border);margin-top:0;font-size:12px;color:var(--text-3);letter-spacing:0}
+.legenda-c{display:flex;gap:16px;font-size:12px;color:var(--text-2);padding:0 24px 18px;letter-spacing:0}
+.ponto{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+#dica{position:fixed;z-index:50;pointer-events:none;background:var(--elevated);border:1px solid var(--border);box-shadow:var(--shadow-md);border-radius:var(--r-md);padding:8px 12px;font-size:13px;line-height:1.45;letter-spacing:0;white-space:nowrap}
+
+/* tabelas e listas */
+.tabela{width:100%;border-collapse:collapse;font-size:15px}
+.tabela th{font-size:12px;font-weight:400;color:var(--text-3);text-align:left;padding:12px 20px;letter-spacing:0;border-bottom:1px solid var(--border)}
+.tabela td{padding:14px 20px;border-bottom:1px solid var(--border)}
+.tabela tr:last-child td{border-bottom:0}
+.tabela .d{text-align:right}
+.rolagem{overflow-x:auto}
+.itens .item{display:grid;grid-template-columns:1fr auto;gap:4px 16px;padding:16px 22px;border-top:1px solid var(--border);color:var(--text);transition:background .15s}
+.itens .item:first-child{border-top:0}
+.itens a.item:hover{background:var(--neutral-soft)}
+.itens .item .n{font-weight:600}
+.itens .item .s{font-size:13px;color:var(--text-2);grid-column:1/-1}
+.itens .item .v{font-weight:600;text-align:right}
+.dupla{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:860px){.dupla{grid-template-columns:1fr}}
+.subt{font-size:21px;font-weight:600;letter-spacing:-.01em;margin:0 0 14px}
+.vazio{padding:36px 22px;color:var(--text-2);text-align:center;font-size:15px}
+.fim{padding:48px 0 80px;border-top:1px solid var(--border);color:var(--text-3);font-size:13px;line-height:1.7;letter-spacing:0}
+
+.dois{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:900px){.dois{grid-template-columns:1fr}}
+.horas{display:flex;align-items:flex-end;gap:4px;height:140px;padding:24px 24px 0}
+.horas .coluna .b{background:var(--info)}
+</style>
+</head>
+<body>
+<main id="app" class="hidden">
+  <div class="wrap">
+    <section class="hero">
+      <div class="eyebrow" id="sobre">Relatório</div>
+      <h1 class="display" id="titulo">Carregando…</h1>
+      <p class="lede" id="resumo"></p>
+      <div class="controle seg" id="periodos">
+        <button data-p="hoje">Hoje</button><button data-p="7d">7 dias</button><button data-p="30d">30 dias</button><button data-p="mes">Este mês</button><button data-p="mesant">Mês passado</button>
+      </div>
+    </section>
+
+    <section class="bloco">
+      <div class="eyebrow">Resultado</div><h2 class="headline">Do clique à venda.</h2>
+      <div class="stats" id="stats" style="margin-top:32px"></div>
+    </section>
+
+    <section class="bloco">
+      <div class="eyebrow">Ritmo</div><h2 class="headline">Leads por dia.</h2>
+      <p class="lede">Cada coluna é um dia. O ponto verde marca dia com venda.</p>
+      <div class="card" style="margin-top:28px"><div class="colunas" id="dias"></div><div class="eixo" id="eixo"></div>
+        <div class="legenda-c"><span><i class="ponto" style="background:var(--accent)"></i>Leads</span><span><i class="ponto" style="background:var(--ok)"></i>Teve venda</span></div></div>
+    </section>
+
+    <section class="bloco">
+      <div class="dois">
+        <div><div class="eyebrow">Origem</div><h2 class="headline">De onde vieram.</h2><div class="card barras" id="origem" style="margin-top:24px"></div></div>
+        <div><div class="eyebrow">Atendimento</div><h2 class="headline">Como o lead foi tratado.</h2><div class="card barras" id="atend" style="margin-top:24px"></div></div>
+      </div>
+    </section>
+
+    <section class="bloco">
+      <div class="eyebrow">Horário</div><h2 class="headline">A que horas o lead chega.</h2>
+      <div class="card" style="margin-top:28px"><div class="horas" id="horas"></div><div class="eixo"><span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>23h</span></div></div>
+    </section>
+
+    <section class="bloco">
+      <div class="dois">
+        <div><div class="eyebrow">Bairros</div><h2 class="headline">Onde estão.</h2><div class="card rolagem" style="margin-top:24px"><table class="tabela" id="bairros"></table></div></div>
+        <div><div class="eyebrow">Perdas</div><h2 class="headline">Por que não fechou.</h2><div class="card barras" id="perdas" style="margin-top:24px"></div></div>
+      </div>
+    </section>
+    <p class="caption" style="margin:24px 0 64px">Os números saem do mesmo banco do CRM, ao vivo.</p>
+  </div>
+</main>
+<div id="dica" class="hidden"></div>
+<script>
+const { $, esc, brl, brlCurto, int, pct, duracao, periodo, MESES, guarda } = Painel;
+let sb, chave = guarda.ler('periodo-rel', '30d');
+const barras = (el, itens, total) => {
+  const max = Math.max(1, ...itens.map(i => i[1]));
+  $(el).innerHTML = itens.length ? itens.map(([n, v, s]) => `<div class="barra"><div class="nome">${esc(n)}</div><div class="trilho"><div class="preench" style="width:${v / max * 100}%"></div></div><div class="num">${int(v)}<small>${s ?? pct(v, total)}</small></div></div>`).join('') : '<div class="caption" style="padding:16px 0">Sem dados no período.</div>';
+};
+async function carregar() {
+  document.querySelectorAll('#periodos button').forEach(b => b.classList.toggle('on', b.dataset.p === chave));
+  const [de, ate] = periodo(chave);
+  const { data: r, error } = await sb.rpc('painel_relatorio', { p_de: de.toISOString(), p_ate: ate.toISOString() });
+  if (error) { $('#titulo').textContent = 'Não consegui carregar.'; $('#resumo').textContent = error.message; return; }
+  const t = r.totais || {};
+  const rot = { hoje: 'Hoje', '7d': 'Últimos 7 dias', '30d': 'Últimos 30 dias', mes: MESES[de.getMonth()], mesant: MESES[de.getMonth()] }[chave];
+  $('#sobre').textContent = 'Relatório · ' + rot;
+  $('#titulo').textContent = t.leads ? `${int(t.leads)} ${t.leads === 1 ? 'lead' : 'leads'}, ${int(t.ganhos)} ${t.ganhos === 1 ? 'venda' : 'vendas'}.` : 'Nenhum lead no período.';
+  const pl = (n, um, varios) => `${int(n)} ${n === 1 ? um : varios}`;
+  $('#resumo').textContent = t.leads ? `${brl(t.receita)} em vendas. ${pl(t.google, 'lead veio', 'leads vieram')} do Google Ads e ${pl(t.ganhos_google, 'virou venda', 'viraram venda')} (${brl(t.receita_google)}).` : '';
+  $('#stats').innerHTML = [
+    [int(t.leads), 'Leads', `${int(t.google)} do Google Ads`],
+    [int(t.ganhos), 'Vendas', pct(t.ganhos, t.leads, 1) + ' de conversão'],
+    [brlCurto(t.receita), 'Receita', t.ganhos ? 'ticket ' + brl(t.receita / t.ganhos) : '—'],
+    [t.resp_mediana_seg != null ? duracao(t.resp_mediana_seg) : '—', 'Resposta da equipe', 'mediana até a 1ª resposta']
+  ].map(([v, r2, c]) => `<div class="card stat"><div class="v num">${v}</div><div class="r">${r2}</div><div class="c">${c}</div></div>`).join('');
+  // dias
+  const dias = r.por_dia || [], maxd = Math.max(1, ...dias.map(d => d.leads));
+  $('#dias').innerHTML = dias.map(d => `<div class="coluna" data-d="${d.dia}" data-l="${d.leads}" data-g="${d.ganhos}" data-r="${d.receita}"><div class="b" style="height:${d.leads / maxd * 100}%"></div>${d.ganhos ? '<i class="venda" style="bottom:calc(' + (d.leads / maxd * 100) + '% + 6px)"></i>' : ''}</div>`).join('') || '<div class="caption">Sem dados.</div>';
+  const fmt = s => s ? s.slice(8, 10) + '/' + s.slice(5, 7) : '';
+  $('#eixo').innerHTML = dias.length ? `<span>${fmt(dias[0].dia)}</span><span>${fmt(dias[dias.length - 1].dia)}</span>` : '';
+  // origem e atendimento
+  barras('#origem', [['Google Ads', t.google], ['Site sem clique', t.site], ['WhatsApp direto', t.organico], ['Meta', t.meta]].filter(i => i[1] > 0), t.leads);
+  barras('#atend', [['Informou o carro', t.com_carro], ['Informou o bairro', t.com_bairro], ['Equipe respondeu', t.respondidos],
+    ['Sem resposta da equipe', t.sem_resposta_humano], ['Recebeu follow-up', t.followups], ['Voltou após o follow-up', t.responderam_followup, pct(t.responderam_followup, t.followups)]], t.leads);
+  // horas
+  const hs = Array.from({ length: 24 }, (_, h) => ((r.por_hora || []).find(x => x.hora === h) || { leads: 0 }).leads), maxh = Math.max(1, ...hs);
+  $('#horas').innerHTML = hs.map((v, h) => `<div class="coluna" data-h="${h}" data-v="${v}"><div class="b" style="height:${v / maxh * 100}%"></div></div>`).join('');
+  // bairros e perdas
+  const bs = r.bairros || [];
+  $('#bairros').innerHTML = bs.length ? '<tr><th>Bairro</th><th class="d">Leads</th><th class="d">Vendas</th></tr>' + bs.map(b => `<tr><td>${esc(b.bairro)}</td><td class="d num">${int(b.leads)}</td><td class="d num">${int(b.ganhos)}</td></tr>`).join('') : '<tr><td class="caption">Sem bairro informado no período.</td></tr>';
+  const ps = r.motivos_perda || [], tp = ps.reduce((s, p) => s + p.n, 0);
+  barras('#perdas', ps.map(p => [p.motivo, p.n]), tp);
+}
+// dica ao passar o mouse
+document.addEventListener('mousemove', e => {
+  const c = e.target.closest && e.target.closest('.coluna'), d = $('#dica');
+  if (!c) { d.classList.add('hidden'); return; }
+  d.innerHTML = c.dataset.d ? `<b>${c.dataset.d.split('-').reverse().join('/')}</b><br>${c.dataset.l} leads · ${c.dataset.g} vendas${Number(c.dataset.r) ? ' · ' + brl(c.dataset.r) : ''}` : `<b>${c.dataset.h}h</b><br>${c.dataset.v} leads`;
+  d.style.left = Math.min(e.clientX + 14, innerWidth - d.offsetWidth - 10) + 'px'; d.style.top = (e.clientY + 14) + 'px'; d.classList.remove('hidden');
+});
+Painel.iniciar('relatorio', (cliente) => {
+  sb = cliente;
+  $('#periodos').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { chave = b.dataset.p; guarda.gravar('periodo-rel', chave); carregar(); } });
+  carregar();
+});
+</script>
+</body>
+</html>
