@@ -98,7 +98,7 @@
     </section>
 
     <section class="card lista" id="lista"></section>
-    <p class="rodape">A IA lê as conversas paradas a cada 30 minutos e mostra <b>Possível venda</b> quando encontra uma: confira o valor e clique em <b>Confirmar venda</b> (venda por áudio a IA ainda não lê; nesses casos marque na mão). Marque <b>Vendido</b> com o valor assim que a venda fechar. Venda de lead que veio do Google Ads volta pro Google sozinha no dia seguinte, e é isso que ensina o Google a trazer mais cliente que compra.</p>
+    <p class="rodape">A IA lê as conversas paradas a cada 15 minutos (áudios inclusive, transcritos) e mostra <b>Possível venda</b> ou <b>Possível perda</b> pra você confirmar. Cliente que some depois da resposta da loja recebe follow-up 1 hora depois e outro no dia seguinte. Marque <b>Vendido</b> com o valor assim que a venda fechar. Venda de lead que veio do Google Ads volta pro Google sozinha no dia seguinte, e é isso que ensina o Google a trazer mais cliente que compra.</p>
   </div>
 </main>
 <div id="raiz-modal"></div>
@@ -149,13 +149,13 @@ function render() {
     ['Vendas do Google', int(ganhos.filter(l => l.canal === 'google').length), brl(ganhos.filter(l => l.canal === 'google').reduce((s, l) => s + Number(l.venda_valor || 0), 0))]
   ].map(([l, v, s, c]) => `<div class="card kpi ${c || ''}"><div class="caption">${l}</div><div class="v num">${v}</div><div class="s">${s}</div></div>`).join('');
 
-  const cont = { todos: total, sugestao: leads.filter(l => l.sugestao).length }; leads.forEach(l => cont[l.status] = (cont[l.status] || 0) + 1);
-  $('#filtros').innerHTML = (cont.sugestao ? ['sugestao'] : []).concat(['todos', 'triagem', 'atendimento', 'vendido', 'perdido'])
-    .map(k => `<button class="filtro ${filtro === k ? 'on' : ''}" data-f="${k}">${k === 'todos' ? 'Todos' : k === 'sugestao' ? 'Venda a confirmar' : STATUS[k]}<b>${cont[k] || 0}</b></button>`).join('');
+  const cont = { todos: total, sugestao: leads.filter(l => l.sugestao).length, esperando: leads.filter(l => l.ia_situacao === 'aguardando_loja' && !l.sugestao).length }; leads.forEach(l => cont[l.status] = (cont[l.status] || 0) + 1);
+  $('#filtros').innerHTML = (cont.sugestao ? ['sugestao'] : []).concat(cont.esperando ? ['esperando'] : []).concat(['todos', 'triagem', 'atendimento', 'vendido', 'perdido'])
+    .map(k => `<button class="filtro ${filtro === k ? 'on' : ''}" data-f="${k}">${k === 'todos' ? 'Todos' : k === 'sugestao' ? 'A IA sugeriu' : k === 'esperando' ? 'Cliente esperando' : STATUS[k]}<b>${cont[k] || 0}</b></button>`).join('');
   if (filtro === 'sugestao' && !cont.sugestao) filtro = 'todos';
 
   const q = $('#busca').value.trim().toLowerCase();
-  const vis = leads.filter(l => (filtro === 'todos' || l.status === filtro || (filtro === 'sugestao' && l.sugestao)) &&
+  const vis = leads.filter(l => (filtro === 'todos' || l.status === filtro || (filtro === 'sugestao' && l.sugestao) || (filtro === 'esperando' && l.ia_situacao === 'aguardando_loja' && !l.sugestao)) &&
     (!q || [l.nome, l.telefone, l.carro, l.bairro, fone(l.telefone)].some(x => String(x || '').toLowerCase().includes(q))));
   if (!vis.length) { $('#lista').innerHTML = `<div class="vazio">${total ? 'Nenhum lead com esse filtro.' : 'Nenhum lead nesse período.'}</div>`; return; }
 
@@ -174,7 +174,7 @@ function render() {
       <div class="st"><span class="pill p-${l.status}">${STATUS[l.status]}</span></div>
       <div class="valor">${valor}</div>
       <div class="acoes">${acoes}<button class="btn sm quiet" data-a="conversa" data-t="${esc(l.telefone)}">Conversa</button><a class="btn sm quiet" href="https://wa.me/${esc(l.telefone)}" target="_blank" rel="noopener">WhatsApp</a></div>
-      ${l.sugestao ? sugestaoHTML(l) : ''}
+      ${l.sugestao ? sugestaoHTML(l) : situacaoHTML(l)}
     </div>`;
   }).join('');
 }
@@ -182,9 +182,19 @@ function render() {
 function sugestaoHTML(l) {
   const s = l.sugestao || {};
   const conf = { alta: 'alta', media: 'média', baixa: 'baixa' }[s.confianca] || s.confianca || '';
+  if (s.tipo === 'perdido') return `<div class="sug perda"><span class="pill p-ia">IA</span><div class="t"><b>Possível perda</b>${s.motivo ? ' · ' + esc(s.motivo) : ''}
+    <span class="caption"> · certeza ${esc(conf)}</span>${s.evidencia ? `<br><q>${esc(s.evidencia)}</q>` : ''}</div>
+    <div class="ac"><button class="btn sm perdido" data-a="confirmarPerdaIA" data-t="${esc(l.telefone)}">Confirmar perdido</button><button class="btn sm quiet" data-a="descartarIA" data-t="${esc(l.telefone)}">Não foi perdido</button></div></div>`;
   return `<div class="sug"><span class="pill p-ia">IA</span><div class="t"><b>Possível venda${s.valor ? ' de ' + brl(s.valor, 2) : ''}</b>${s.produto ? ' · ' + esc(s.produto) : ''}
     <span class="caption"> · certeza ${esc(conf)}</span>${s.evidencia ? `<br><q>${esc(s.evidencia)}</q>` : ''}</div>
     <div class="ac"><button class="btn sm ganho" data-a="confirmarIA" data-t="${esc(l.telefone)}">Confirmar venda</button><button class="btn sm quiet" data-a="descartarIA" data-t="${esc(l.telefone)}">Não foi venda</button></div></div>`;
+}
+// leitura da IA sobre o ponto da conversa (só pra lead em aberto)
+const SIT = { aguardando_cliente: ['Cliente sem responder', 'sit-cli'], aguardando_loja: ['Cliente esperando a loja', 'sit-loja'], em_andamento: ['Combinado em andamento', 'sit-and'] };
+function situacaoHTML(l) {
+  const x = SIT[l.ia_situacao]; if (!x || l.sugestao) return '';
+  const fu = l.ia_situacao === 'aguardando_cliente' && l.posfu_step ? ` · follow-up ${l.posfu_step}/2 enviado` : '';
+  return `<div class="sit ${x[1]}" title="${esc(l.ia_resumo || '')}"><b>${x[0]}</b>${fu}${l.ia_resumo ? ' · ' + esc(l.ia_resumo) : ''}</div>`;
 }
 
 /* ---------- ações ---------- */
@@ -208,18 +218,20 @@ function ganho(t, sug) {
     executar({ p_telefone: t, p_acao: 'vendido', p_valor: v, p_data: $('#m-data').value || null, p_motivo: $('#m-obs').value.trim() || null }, 'Venda registrada');
   };
 }
-function perdido(t) {
+function perdido(t, motivoIA) {
   const l = lead(t);
   modal(`<div class="modal"><h3>Marcar como perdido</h3><div class="sub">${esc(l.nome || fone(t))}</div>
     <label class="l" for="m-mot">Motivo</label>
-    <select id="m-mot" class="in"><option value="">Sem motivo</option><option>Achou caro</option><option>Fechou com concorrente</option><option>Desistiu ou parou de responder</option><option>Fora da área de entrega</option><option>Não tinha a bateria</option><option>Só pesquisando preço</option><option>Outro</option></select>
+    <select id="m-mot" class="in"><option value="">Sem motivo</option><option>Achou caro</option><option>Fechou com concorrente</option><option>Desistiu ou parou de responder</option><option>Fora da área de entrega</option><option>Não tinha a bateria</option><option>Só pesquisando preço</option><option>Não era cliente</option><option>Outro</option></select>
     <div class="erro" id="m-erro"></div>
     <div class="pe"><button class="btn quiet" id="m-x">Cancelar</button><button class="btn primary" id="m-ok">Salvar</button></div></div>`);
   $('#m-x').onclick = fechar;
+  if (motivoIA) { const o = [...$('#m-mot').options].find(x => x.text === motivoIA); if (o) $('#m-mot').value = o.value || o.text; }
   $('#m-ok').onclick = () => executar({ p_telefone: t, p_acao: 'perdido', p_motivo: $('#m-mot').value || null }, 'Marcado como perdido');
 }
 const reabrir = (t) => executar({ p_telefone: t, p_acao: 'reabrir' }, 'Lead reaberto');
 const confirmarIA = (t) => ganho(t, lead(t).sugestao || {});
+const confirmarPerdaIA = (t) => perdido(t, (lead(t).sugestao || {}).motivo);
 const descartarIA = (t) => executar({ p_telefone: t, p_acao: 'descartar_sugestao' }, 'Sugestão descartada');
 
 async function executar(args, msg) {
@@ -268,7 +280,7 @@ Painel.iniciar('crm', (cliente, quem) => {
   $('#b-atual').onclick = carregar; $('#b-csv').onclick = csv;
   $('#lista').addEventListener('click', e => {
     const b = e.target.closest('[data-a]'); if (!b) return;
-    ({ ganho, perdido, reabrir, conversa, confirmarIA, descartarIA })[b.dataset.a](b.dataset.t);
+    ({ ganho, perdido, reabrir, conversa, confirmarIA, confirmarPerdaIA, descartarIA })[b.dataset.a](b.dataset.t);
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') fechar(); });
   setPeriodo(chave);

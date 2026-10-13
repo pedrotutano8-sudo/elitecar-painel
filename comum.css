@@ -123,3 +123,7 @@ label.l{display:block;font-size:13px;color:var(--text-2);margin:14px 0 6px}
 .p-fila{background:var(--info-soft);color:var(--info)}
 .p-recusada{background:var(--bad-soft);color:var(--bad)}
 @media (max-width:480px){.nav .marca{display:none}.nav .wrap{gap:8px}.nav .seg a{padding:0 10px}.nav .seg{margin-right:auto}}
+.sug.perda{background:var(--bad-soft);border-color:color-mix(in srgb,var(--bad) 30%,transparent)}
+.sit{grid-column:1/-1;font-size:13px;color:var(--text-2);padding:6px 12px;border-radius:var(--r-md);border:1px solid var(--border);line-height:1.45}
+.sit b{font-weight:600}
+.sit-cli b{color:var(--info)}.sit-loja{border-color:color-mix(in srgb,var(--bad) 40%,transparent)}.sit-loja b{color:var(--bad)}.sit-and b{color:var(--ok)}
