@@ -56,9 +56,9 @@
       </div>
     </section>
     <section class="kpis" id="kpis"></section>
-    <section class="ferramentas"><div class="filtros" id="filtros"></div><button class="btn sm quiet" id="b-atual">Atualizar</button></section>
+    <section class="ferramentas"><div class="filtros" id="filtros"></div><button class="btn sm" id="b-imp">Puxar números do Google</button><input type="file" id="f-imp" accept=".csv,.tsv,.txt,text/csv" class="hidden"><button class="btn sm quiet" id="b-atual">Atualizar</button></section>
     <section class="card lista" id="lista"></section>
-    <p class="rodape" id="rodape">As ligações dos anúncios do Google entram aqui sozinhas, de hora em hora. Para cada ligação atendida, marque se <b>virou venda</b>. Com o número do cliente, a venda volta pro Google como conversão de ligação e ensina o Google a trazer mais ligação que compra.</p>
+    <p class="rodape" id="rodape">As ligações dos anúncios do Google entram aqui sozinhas, de hora em hora. Para cada ligação atendida, marque se <b>virou venda</b>. Com o número do cliente, a venda volta pro Google como conversão de ligação e ensina o Google a trazer mais ligação que compra. Use <b>Puxar números do Google</b> (ou arraste o CSV do relatório "Detalhes da chamada" pra esta página) para trazer o número de quem ligou: dá pra ligar de volta nas perdidas e a venda já sai com o telefone.</p>
   </div>
 </main>
 <div id="raiz-modal"></div>
@@ -106,12 +106,13 @@ function render() {
       ? `<div class="p num">${brl(l.valor, 2)}</div><div class="s">${l.telefone_cliente ? esc(fone(l.telefone_cliente)) : 'sem telefone: não volta pro Google'}${g && g !== 'sem telefone' ? ` · <span class="pill ${gp}" title="${esc(g)}">${g.startsWith('recusada') ? 'Google recusou' : g === 'enviada' ? 'enviada ao Google' : g === 'na fila' ? 'vai pro Google' : esc(g)}</span>` : ''}</div>`
       : l.resultado === 'sem_venda' ? `<div class="c">Não virou venda</div><div class="s">${esc(l.obs || '')}</div>` : '<span class="s">—</span>';
     const travada = l.google === 'enviada';
-    const acoes = l.status !== 'atendida' && !l.resultado ? ''
+    const contato = l.telefone_cliente ? `<a class="btn sm quiet" href="tel:+${esc(l.telefone_cliente)}">Ligar</a><a class="btn sm quiet" href="https://wa.me/${esc(l.telefone_cliente)}" target="_blank" rel="noopener">WhatsApp</a>` : '';
+    const acoes = l.status !== 'atendida' && !l.resultado ? (l.telefone_cliente ? `<span class="s" style="margin-right:6px">ligar de volta:</span>${contato}` : '')
       : travada ? '<span class="s">já está no Google</span>'
       : `<button class="btn sm ganho" data-a="venda" data-i="${esc(l.id)}">${l.resultado === 'venda' ? 'Editar venda' : 'Virou venda'}</button>` +
         (l.resultado ? `<button class="btn sm quiet" data-a="limpar" data-i="${esc(l.id)}">Limpar</button>` : `<button class="btn sm perdido" data-a="sem" data-i="${esc(l.id)}">Não virou</button>`);
     return `<div class="lig">
-      <div class="quando"><div class="p num">${dataHora(l.inicio)}</div><div class="s">${l.status === 'atendida' ? duracao(l.duracao_seg) : 'não atendida'}${l.ddd ? ' · DDD ' + esc(l.ddd) : ''}</div></div>
+      <div class="quando"><div class="p num">${dataHora(l.inicio)}</div><div class="s">${l.status === 'atendida' ? duracao(l.duracao_seg) : 'não atendida'} · ${l.telefone_cliente ? '<b class="num" style="color:var(--text-2)">' + esc(fone(l.telefone_cliente)) + '</b>' : (l.ddd ? 'DDD ' + esc(l.ddd) : 'sem número')}</div></div>
       <div class="camp"><div class="c">${esc(l.campanha || 'Campanha')}</div><div class="s">ligou pelo ${esc(l.origem || 'anúncio')}${varias ? ' · ' + esc(l.loja_nome) : ''}</div></div>
       <div class="st"><span class="pill p-${esc(l.status)}">${l.status === 'atendida' ? 'Atendida' : 'Perdida'}</span></div>
       <div class="res">${res}</div>
@@ -151,6 +152,55 @@ function sem(i) {
   $('#m-x').onclick = fechar;
   $('#m-ok').onclick = () => executar({ p_id: i, p_resultado: 'sem_venda', p_obs: $('#m-obs').value || null }, 'Marcado');
 }
+/* ---------- números do relatório "Detalhes da chamada" do Google Ads ----------
+   A API do Google só entrega o DDD; o relatório da tela traz o número completo.
+   Lê o CSV baixado (UTF-8 ou UTF-16, vírgula/ponto e vírgula/tab) e casa por dia + hora + duração + campanha. */
+const MES = { jan: 1, fev: 2, mar: 3, abr: 4, mai: 5, jun: 6, jul: 7, ago: 8, set: 9, out: 10, nov: 11, dez: 12, feb: 2, apr: 4, may: 5, aug: 8, sep: 9, oct: 10, dec: 12 };
+function lerData(t) {
+  t = String(t || '').trim().toLowerCase();
+  let m = t.match(/(\d{4})-(\d{2})-(\d{2})[ t](\d{1,2})/);
+  if (m) return { dia: `${m[1]}-${m[2]}-${m[3]}`, hora: +m[4] };
+  m = t.match(/(\d{1,2}) de ([a-zç]{3})[a-zç.]* de (\d{4})\D+(\d{1,2})/);
+  if (m && MES[m[2]]) return { dia: `${m[3]}-${String(MES[m[2]]).padStart(2, '0')}-${m[1].padStart(2, '0')}`, hora: +m[4] };
+  m = t.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\D+(\d{1,2})/);
+  if (m) return { dia: `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`, hora: +m[4] };
+  m = t.match(/([a-z]{3})[a-z.]* (\d{1,2}), (\d{4})\D+(\d{1,2})(?::\d{2})*\s*(am|pm)?/);
+  if (m && MES[m[1]]) { let h = +m[4]; if (m[5] === 'pm' && h < 12) h += 12; if (m[5] === 'am' && h === 12) h = 0; return { dia: `${m[3]}-${String(MES[m[1]]).padStart(2, '0')}-${m[2].padStart(2, '0')}`, hora: h }; }
+  return null;
+}
+function lerCSV(buf) {
+  const b = new Uint8Array(buf);
+  let txt = (b[0] === 0xFF && b[1] === 0xFE) ? new TextDecoder('utf-16le').decode(buf) : (b[0] === 0xFE && b[1] === 0xFF) ? new TextDecoder('utf-16be').decode(buf) : new TextDecoder('utf-8').decode(buf);
+  txt = txt.replace(/^\uFEFF/, '');
+  const linhas = txt.split(/\r?\n/).filter(x => x.trim());
+  const iCab = linhas.findIndex(x => /hor[áa]rio de in[íi]cio|start time/i.test(x) && /telefone|phone/i.test(x));
+  if (iCab < 0) return null;
+  const sep = [',', ';', '\t'].sort((a, c) => linhas[iCab].split(c).length - linhas[iCab].split(a).length)[0];
+  const quebra = (l) => { const out = []; let f = '', q = false; for (const ch of l) { if (q) { if (ch === '"') q = false; else f += ch; } else if (ch === '"') q = true; else if (ch === sep) { out.push(f); f = ''; } else f += ch; } out.push(f); return out.map(x => x.trim()); };
+  const cab = quebra(linhas[iCab]).map(x => x.toLowerCase());
+  const col = (re) => cab.findIndex(x => re.test(x));
+  const cI = col(/hor[áa]rio de in[íi]cio|start time/), cD = col(/dura[çc][ãa]o|duration/), cT = col(/n[úu]mero de telefone|caller phone|phone number/), cC = col(/^campanha$|^campaign$/);
+  if (cI < 0 || cT < 0) return null;
+  return linhas.slice(iCab + 1).map(quebra).map(r => {
+    const d = lerData(r[cI]); const tel = String(r[cT] || '').replace(/\D/g, '');
+    if (!d || tel.length < 10) return null;
+    return { dia: d.dia, hora: d.hora, duracao: cD >= 0 && /^\d+$/.test(String(r[cD]).replace(/\D/g, '')) ? +String(r[cD]).replace(/\D/g, '') : null, campanha: cC >= 0 ? r[cC] : null, telefone: tel };
+  }).filter(Boolean);
+}
+async function importar(arq) {
+  if (!arq) return;
+  const itens = lerCSV(await arq.arrayBuffer());
+  $('#f-imp').value = '';
+  if (!itens) { toast('Não reconheci o arquivo. Baixe o relatório "Detalhes da chamada" em CSV.'); return; }
+  if (!itens.length) { toast('O arquivo não tem ligação com número.'); return; }
+  const { data, error } = await sb.rpc('painel_ligacoes_numeros', { p_itens: itens });
+  if (error) { toast(error.message); return; }
+  modal(`<div class="modal"><h3>Números do Google</h3><div class="sub">${int(itens.length)} ${itens.length === 1 ? 'ligação' : 'ligações'} no arquivo</div>
+    <p style="line-height:1.6;margin:14px 0 0"><b>${int(data.preenchidas)}</b> número(s) preenchido(s)${data.ja_tinham ? `<br>${int(data.ja_tinham)} já tinham número` : ''}${data.sem_par ? `<br>${int(data.sem_par)} não acharam a ligação aqui (fora das lojas que você vê ou ainda não sincronizada)` : ''}${data.ambiguas ? `<br>${int(data.ambiguas)} ficaram em dúvida (duas ligações iguais na mesma hora) e não foram preenchidas` : ''}</p>
+    <div class="pe"><button class="btn primary" id="m-x">Ok</button></div></div>`);
+  $('#m-x').onclick = () => { fechar(); carregar(); };
+}
+
 const limpar = (i) => executar({ p_id: i, p_resultado: 'limpar' }, 'Resultado apagado');
 
 async function executar(args, msg) {
@@ -166,6 +216,17 @@ Painel.iniciar('ligacoes', (cliente, quem) => {
   $('#periodos').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { chave = b.dataset.p; guarda.gravar('periodo-lig', chave); carregar(); } });
   $('#filtros').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) { filtro = b.dataset.f; render(); } });
   $('#b-atual').onclick = carregar;
+  $('#b-imp').onclick = () => modal(`<div class="modal"><h3>Puxar números do Google</h3>
+    <div class="sub">O Google não entrega o número completo pela integração, só pela tela. Leva 30 segundos:</div>
+    <ol style="line-height:1.7;padding-left:20px;margin:14px 0 0;font-size:14px">
+      <li>No Google Ads da loja: <b>Campanhas → Insights e relatórios → Detalhes da chamada</b> (ou o relatório salvo "Detalhes da chamada").</li>
+      <li>Escolha o período (ex.: últimos 7 dias).</li>
+      <li>Clique em <b>Download → .csv</b>.</li>
+      <li>Solte o arquivo aqui embaixo. Pode repetir sem medo: só preenche o que falta.</li></ol>
+    <div class="pe"><button class="btn quiet" id="m-x">Cancelar</button><button class="btn primary" id="m-arq">Escolher arquivo</button></div></div>`) || ($('#m-x').onclick = fechar, $('#m-arq').onclick = () => $('#f-imp').click());
+  $('#f-imp').addEventListener('change', e => { fechar(); importar(e.target.files[0]); });
+  document.addEventListener('dragover', e => e.preventDefault());
+  document.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) { fechar(); importar(f); } });
   $('#lista').addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (b) ({ venda, sem, limpar })[b.dataset.a](b.dataset.i); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') fechar(); });
   carregar();
