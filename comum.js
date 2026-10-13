@@ -23,6 +23,13 @@
     return (seg / 3600).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' h';
   };
 
+  // "R$ 1.234,56" | "689,90" | "689.90" -> número
+  const valorBR = (t) => {
+    const raw = String(t || '').trim().replace(/[R$\s]/g, '');
+    const v = Number(raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw.replace(/\.(?=\d{3}(\D|$))/g, ''));
+    return isFinite(v) && v > 0 ? v : null;
+  };
+
   const STATUS = { triagem: 'Com o bot', atendimento: 'Em atendimento', vendido: 'Vendido', perdido: 'Perdido' };
   const CANAL = { google: 'Google Ads', meta: 'Meta', site: 'Site', organico: 'WhatsApp direto' };
 
@@ -77,9 +84,11 @@
 
   function nav(pagina, nome) {
     return `<header class="nav"><div class="wrap">
-      <div class="marca"><b>${esc(MARCA)}</b><span> · ${pagina === 'crm' ? 'Comercial' : 'Relatório ao vivo'}</span></div>
+      <div class="marca"><b>${esc(MARCA)}</b><span> · ${({ crm: 'Comercial', relatorio: 'Relatório ao vivo', campanhas: 'Google Ads', ligacoes: 'Ligações' })[pagina] || ''}</span></div>
       <nav class="seg" aria-label="Seções">
         <a href="index.html" class="${pagina === 'crm' ? 'on' : ''}">CRM</a>
+        <a href="ligacoes.html" class="${pagina === 'ligacoes' ? 'on' : ''}">Ligações</a>
+        <a href="campanhas.html" class="${pagina === 'campanhas' ? 'on' : ''}">Campanhas</a>
         <a href="relatorio.html" class="${pagina === 'relatorio' ? 'on' : ''}">Relatório</a>
       </nav>
       <button class="sair" id="b-sair" title="${esc(nome || '')}">Sair</button>
@@ -123,5 +132,5 @@
     aoEntrar(sb, eu || {});
   }
 
-  window.Painel = { $, esc, brl, brlCurto, int, pct, dataHora, data, fone, duracao, periodo, MESES, STATUS, CANAL, MARCA, guarda, toast, iniciar, loja, lojaNome, quandoTrocarLoja };
+  window.Painel = { valorBR, $, esc, brl, brlCurto, int, pct, dataHora, data, fone, duracao, periodo, MESES, STATUS, CANAL, MARCA, guarda, toast, iniciar, loja, lojaNome, quandoTrocarLoja };
 })();

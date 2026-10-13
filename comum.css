@@ -112,3 +112,14 @@ label.l{display:block;font-size:13px;color:var(--text-2);margin:14px 0 6px}
 .barra-lojas .caption{white-space:nowrap}
 .seg button:disabled{opacity:.45;cursor:default}
 .loja-tag{display:inline-block;font-size:11px;color:var(--text-2);border:1px solid var(--border);border-radius:980px;padding:1px 8px;margin-top:4px}
+/* etapa 2 · sugestão de venda da IA */
+.sug{grid-column:1/-1;display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-radius:var(--r-md,12px);background:var(--warn-soft);border:1px solid color-mix(in srgb,var(--warn) 35%,transparent)}
+.sug .t{flex:1;min-width:220px;font-size:14px;line-height:1.45}
+.sug .t b{font-weight:600}
+.sug .t q{color:var(--text-2);font-style:italic}
+.sug .ac{display:flex;gap:6px;flex-wrap:wrap}
+.p-ia{background:var(--warn-soft);color:var(--warn)}
+.p-enviada{background:var(--ok-soft);color:var(--ok)}
+.p-fila{background:var(--info-soft);color:var(--info)}
+.p-recusada{background:var(--bad-soft);color:var(--bad)}
+@media (max-width:480px){.nav .marca{display:none}.nav .wrap{gap:8px}.nav .seg a{padding:0 10px}.nav .seg{margin-right:auto}}

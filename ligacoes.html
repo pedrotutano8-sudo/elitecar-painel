@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Ligações</title>
+<link rel="stylesheet" href="comum.css">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="comum.js"></script>
+<style>
+.topo{padding:48px 0 8px}
+.topo .linha{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.topo .linha>*{min-width:0;max-width:100%}
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin:32px 0 28px}
+.kpi{padding:18px 18px 16px}
+.kpi .v{font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1.1;margin-top:6px}
+.kpi .s{font-size:12px;color:var(--text-3);margin-top:4px;letter-spacing:0}
+.kpi.destaque .v{color:var(--ok)}
+@media (max-width:980px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:560px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.kpi .v{font-size:23px}}
+.ferramentas{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.filtros{display:flex;gap:6px;overflow-x:auto;max-width:100%;scrollbar-width:none}
+.filtros::-webkit-scrollbar{display:none}
+.filtro{height:32px;padding:0 14px;border-radius:980px;border:1px solid var(--border);background:transparent;color:var(--text-2);font-size:13px;cursor:pointer;white-space:nowrap}
+.filtro b{font-weight:600;margin-left:5px;color:var(--text-3)}
+.filtro.on{background:var(--text);border-color:var(--text);color:var(--bg);font-weight:600}
+.filtro.on b{color:var(--bg);opacity:.6}
+.lista{overflow:hidden}
+.lig{display:grid;grid-template-columns:150px minmax(160px,1.2fr) 110px minmax(150px,1fr) 300px;gap:14px;align-items:center;padding:15px 20px;border-top:1px solid var(--border)}
+.lig:first-child{border-top:0}
+.lig.cab{padding-top:11px;padding-bottom:11px;font-size:12px;color:var(--text-3)}
+.lig .p{font-weight:600}.lig .s{font-size:12px;color:var(--text-3);letter-spacing:0}
+.lig .c{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acoes{display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap}
+.p-atendida{background:var(--info-soft);color:var(--info)}
+.p-perdida{background:var(--bad-soft);color:var(--bad)}
+.vazio{padding:56px 20px;text-align:center;color:var(--text-2);line-height:1.6}
+@media (max-width:900px){
+  .lig.cab{display:none}
+  .lig{grid-template-columns:1fr auto;grid-template-areas:"quando st" "camp camp" "res res" "acoes acoes";row-gap:8px;padding:16px}
+  .lig .quando{grid-area:quando}.lig .st{grid-area:st;justify-self:end}.lig .camp{grid-area:camp}.lig .res{grid-area:res}.lig .acoes{grid-area:acoes;justify-content:flex-start}
+}
+.rodape{color:var(--text-3);font-size:12px;letter-spacing:0;margin:18px 2px 48px;line-height:1.6}
+</style>
+</head>
+<body>
+<main id="app" class="hidden">
+  <div class="wrap">
+    <section class="topo">
+      <div class="eyebrow" id="sobre">Ligações</div>
+      <div class="linha">
+        <h1 class="display" id="titulo">Carregando…</h1>
+        <div class="seg" id="periodos"><button data-p="hoje">Hoje</button><button data-p="7d">7 dias</button><button data-p="30d">30 dias</button><button data-p="mes">Este mês</button><button data-p="mesant">Mês passado</button></div>
+      </div>
+    </section>
+    <section class="kpis" id="kpis"></section>
+    <section class="ferramentas"><div class="filtros" id="filtros"></div><button class="btn sm quiet" id="b-atual">Atualizar</button></section>
+    <section class="card lista" id="lista"></section>
+    <p class="rodape" id="rodape">As ligações dos anúncios do Google entram aqui sozinhas, de hora em hora. Para cada ligação atendida, marque se <b>virou venda</b>. Com o número do cliente, a venda volta pro Google como conversão de ligação e ensina o Google a trazer mais ligação que compra.</p>
+  </div>
+</main>
+<div id="raiz-modal"></div>
+<script>
+const { $, esc, brl, int, pct, dataHora, fone, duracao, periodo, MESES, guarda, toast, valorBR } = Painel;
+let sb, eu = {}, ligs = [], filtro = 'todas', chave = guarda.ler('periodo-lig', '7d');
+const RES = { venda: 'Virou venda', sem_venda: 'Não virou' };
+
+async function carregar() {
+  document.querySelectorAll('#periodos button').forEach(b => b.classList.toggle('on', b.dataset.p === chave));
+  const [de, ate] = periodo(chave);
+  const rot = { hoje: 'Hoje', '7d': 'Últimos 7 dias', '30d': 'Últimos 30 dias', mes: MESES[de.getMonth()], mesant: MESES[de.getMonth()] }[chave];
+  $('#sobre').textContent = 'Ligações · ' + rot + ((eu.lojas || []).length > 1 ? ' · ' + Painel.lojaNome(eu) : '');
+  $('#lista').innerHTML = '<div class="vazio">Carregando…</div>';
+  const { data, error } = await sb.rpc('painel_ligacoes', { p_de: de.toISOString(), p_ate: ate.toISOString(), p_loja: Painel.loja() });
+  if (error) { $('#lista').innerHTML = `<div class="vazio">Não consegui carregar: ${esc(error.message)}</div>`; return; }
+  ligs = data || []; render();
+}
+
+function render() {
+  const at = ligs.filter(l => l.status === 'atendida'), vend = ligs.filter(l => l.resultado === 'venda');
+  const receita = vend.reduce((s, l) => s + Number(l.valor || 0), 0);
+  const aMarcar = at.filter(l => !l.resultado);
+  $('#titulo').textContent = ligs.length ? `${int(ligs.length)} ${ligs.length === 1 ? 'ligação' : 'ligações'}. ${int(vend.length)} ${vend.length === 1 ? 'venda' : 'vendas'}.` : 'Nenhuma ligação ainda.';
+  $('#kpis').innerHTML = [
+    ['Ligações', int(ligs.length), 'dos anúncios do Google'],
+    ['Atendidas', int(at.length), pct(at.length, ligs.length) + ' das ligações'],
+    ['Perdidas', int(ligs.length - at.length), 'ninguém atendeu'],
+    ['A marcar', int(aMarcar.length), 'atendidas sem resultado'],
+    ['Vendas', int(vend.length), pct(vend.length, at.length, 1) + ' das atendidas'],
+    ['Receita', brl(receita), vend.length ? 'ticket ' + brl(receita / vend.length) : 'por ligação', 'destaque']
+  ].map(([l, v, s, c]) => `<div class="card kpi ${c || ''}"><div class="caption">${l}</div><div class="v num">${v}</div><div class="s">${s}</div></div>`).join('');
+  const cont = { todas: ligs.length, marcar: aMarcar.length, atendida: at.length, perdida: ligs.length - at.length, venda: vend.length };
+  const nomes = { todas: 'Todas', marcar: 'A marcar', atendida: 'Atendidas', perdida: 'Perdidas', venda: 'Viraram venda' };
+  $('#filtros').innerHTML = Object.keys(nomes).map(k => `<button class="filtro ${filtro === k ? 'on' : ''}" data-f="${k}">${nomes[k]}<b>${cont[k] || 0}</b></button>`).join('');
+  const vis = ligs.filter(l => filtro === 'todas' || (filtro === 'marcar' ? l.status === 'atendida' && !l.resultado : filtro === 'venda' ? l.resultado === 'venda' : l.status === filtro));
+  if (!vis.length) {
+    $('#lista').innerHTML = `<div class="vazio">${ligs.length ? 'Nenhuma ligação com esse filtro.' : 'Nenhuma ligação nesse período.<br><span class="caption">Se o script do Google Ads ainda não foi instalado, as ligações começam a aparecer depois dele.</span>'}</div>`;
+    return;
+  }
+  const varias = !Painel.loja() && (eu.lojas || []).length > 1;
+  $('#lista').innerHTML = `<div class="lig cab"><div>Quando</div><div>Campanha</div><div>Status</div><div>Resultado</div><div></div></div>` + vis.map(l => {
+    const g = l.google || '', gp = g === 'enviada' ? 'p-enviada' : g.startsWith('recusada') ? 'p-recusada' : 'p-fila';
+    const res = l.resultado === 'venda'
+      ? `<div class="p num">${brl(l.valor, 2)}</div><div class="s">${l.telefone_cliente ? esc(fone(l.telefone_cliente)) : 'sem telefone: não volta pro Google'}${g && g !== 'sem telefone' ? ` · <span class="pill ${gp}" title="${esc(g)}">${g.startsWith('recusada') ? 'Google recusou' : g === 'enviada' ? 'enviada ao Google' : g === 'na fila' ? 'vai pro Google' : esc(g)}</span>` : ''}</div>`
+      : l.resultado === 'sem_venda' ? `<div class="c">Não virou venda</div><div class="s">${esc(l.obs || '')}</div>` : '<span class="s">—</span>';
+    const travada = l.google === 'enviada';
+    const acoes = l.status !== 'atendida' && !l.resultado ? ''
+      : travada ? '<span class="s">já está no Google</span>'
+      : `<button class="btn sm ganho" data-a="venda" data-i="${esc(l.id)}">${l.resultado === 'venda' ? 'Editar venda' : 'Virou venda'}</button>` +
+        (l.resultado ? `<button class="btn sm quiet" data-a="limpar" data-i="${esc(l.id)}">Limpar</button>` : `<button class="btn sm perdido" data-a="sem" data-i="${esc(l.id)}">Não virou</button>`);
+    return `<div class="lig">
+      <div class="quando"><div class="p num">${dataHora(l.inicio)}</div><div class="s">${l.status === 'atendida' ? duracao(l.duracao_seg) : 'não atendida'}${l.ddd ? ' · DDD ' + esc(l.ddd) : ''}</div></div>
+      <div class="camp"><div class="c">${esc(l.campanha || 'Campanha')}</div><div class="s">ligou pelo ${esc(l.origem || 'anúncio')}${varias ? ' · ' + esc(l.loja_nome) : ''}</div></div>
+      <div class="st"><span class="pill p-${esc(l.status)}">${l.status === 'atendida' ? 'Atendida' : 'Perdida'}</span></div>
+      <div class="res">${res}</div>
+      <div class="acoes">${acoes}</div></div>`;
+  }).join('');
+}
+
+const modal = (html) => { $('#raiz-modal').innerHTML = `<div class="veu" id="veu">${html}</div>`; $('#veu').addEventListener('click', e => { if (e.target.id === 'veu') fechar(); }); };
+const fechar = () => { $('#raiz-modal').innerHTML = ''; };
+const lig = (i) => ligs.find(x => x.id === i) || {};
+
+function venda(i) {
+  const l = lig(i);
+  const telIni = l.telefone_cliente ? fone(l.telefone_cliente) : (l.ddd ? `(${l.ddd}) ` : '');
+  modal(`<div class="modal"><h3>Ligação que virou venda</h3><div class="sub">${dataHora(l.inicio)} · ${duracao(l.duracao_seg)} · ${esc(l.campanha || '')}</div>
+    <label class="l" for="m-valor">Valor da venda</label><input id="m-valor" class="in num" inputmode="decimal" placeholder="R$ 650,00" value="${l.valor ? Number(l.valor).toFixed(2).replace('.', ',') : ''}">
+    <label class="l" for="m-tel">Telefone de quem ligou (DDD + número)</label><input id="m-tel" class="in num" inputmode="tel" placeholder="(19) 99999-9999" value="${esc(telIni)}">
+    <div class="caption" style="margin-top:6px">Copie do relatório de ligações do Google Ads ou do celular da loja. Sem o número, a venda conta aqui mas não volta pro Google.</div>
+    <label class="l" for="m-obs">O que foi vendido (opcional)</label><textarea id="m-obs" class="in" placeholder="Moura 60Ah">${esc(l.obs || '')}</textarea>
+    <div class="erro" id="m-erro"></div>
+    <div class="pe"><button class="btn quiet" id="m-x">Cancelar</button><button class="btn primary" id="m-ok">Salvar venda</button></div></div>`);
+  $('#m-x').onclick = fechar; setTimeout(() => $('#m-valor').focus(), 60);
+  $('#m-ok').onclick = () => {
+    const v = valorBR($('#m-valor').value);
+    if (!v) { $('#m-erro').textContent = 'Informe o valor da venda.'; return; }
+    const tel = $('#m-tel').value.replace(/\D/g, '');
+    if (tel && tel.length !== 2 && ![10, 11, 12, 13].includes(tel.length)) { $('#m-erro').textContent = 'Telefone incompleto: DDD + número.'; return; }
+    executar({ p_id: i, p_resultado: 'venda', p_valor: v, p_telefone: tel.length > 2 ? tel : null, p_obs: $('#m-obs').value.trim() || null }, 'Venda registrada');
+  };
+}
+function sem(i) {
+  modal(`<div class="modal"><h3>Ligação não virou venda</h3><div class="sub">${dataHora(lig(i).inicio)}</div>
+    <label class="l" for="m-obs">Motivo (opcional)</label>
+    <select id="m-obs" class="in"><option value="">Sem motivo</option><option>Só pesquisando preço</option><option>Achou caro</option><option>Não tinha a bateria</option><option>Fora da área</option><option>Não era cliente (engano, fornecedor)</option><option>Outro</option></select>
+    <div class="erro" id="m-erro"></div>
+    <div class="pe"><button class="btn quiet" id="m-x">Cancelar</button><button class="btn primary" id="m-ok">Salvar</button></div></div>`);
+  $('#m-x').onclick = fechar;
+  $('#m-ok').onclick = () => executar({ p_id: i, p_resultado: 'sem_venda', p_obs: $('#m-obs').value || null }, 'Marcado');
+}
+const limpar = (i) => executar({ p_id: i, p_resultado: 'limpar' }, 'Resultado apagado');
+
+async function executar(args, msg) {
+  const b = $('#m-ok'); if (b) b.disabled = true;
+  const { error } = await sb.rpc('painel_marcar_ligacao', args);
+  if (error) { if ($('#m-erro')) { $('#m-erro').textContent = error.message; b.disabled = false; } else toast(error.message); return; }
+  fechar(); toast(msg); carregar();
+}
+
+Painel.iniciar('ligacoes', (cliente, quem) => {
+  sb = cliente; eu = quem || {};
+  Painel.quandoTrocarLoja(() => carregar());
+  $('#periodos').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { chave = b.dataset.p; guarda.gravar('periodo-lig', chave); carregar(); } });
+  $('#filtros').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) { filtro = b.dataset.f; render(); } });
+  $('#b-atual').onclick = carregar;
+  $('#lista').addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (b) ({ venda, sem, limpar })[b.dataset.a](b.dataset.i); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') fechar(); });
+  carregar();
+});
+</script>
+</body>
+</html>

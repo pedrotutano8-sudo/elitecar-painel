@@ -98,13 +98,13 @@
     </section>
 
     <section class="card lista" id="lista"></section>
-    <p class="rodape">Marque <b>Vendido</b> com o valor assim que a venda fechar. Venda de lead que veio do Google Ads volta pro Google sozinha no dia seguinte, e é isso que ensina o Google a trazer mais cliente que compra.</p>
+    <p class="rodape">A IA lê as conversas paradas a cada 30 minutos e mostra <b>Possível venda</b> quando encontra uma: confira o valor e clique em <b>Confirmar venda</b> (venda por áudio a IA ainda não lê; nesses casos marque na mão). Marque <b>Vendido</b> com o valor assim que a venda fechar. Venda de lead que veio do Google Ads volta pro Google sozinha no dia seguinte, e é isso que ensina o Google a trazer mais cliente que compra.</p>
   </div>
 </main>
 <div id="raiz-modal"></div>
 
 <script>
-const { $, esc, brl, int, pct, dataHora, fone, STATUS, CANAL, periodo, MESES, guarda, toast } = Painel;
+const { $, esc, brl, int, pct, dataHora, fone, STATUS, CANAL, periodo, MESES, guarda, toast, valorBR } = Painel;
 let eu = {};
 let sb, leads = [], filtro = 'todos', chave = guarda.ler('periodo-crm', 'hoje'), faixa;
 const alvoInicial = new URLSearchParams(location.search).get('lead');
@@ -134,10 +134,11 @@ async function carregar() {
 }
 
 function render() {
-  const total = leads.length, ganhos = leads.filter(l => l.status === 'vendido');
+  const [de0, ate0] = faixa, doPeriodo = leads.filter(l => new Date(l.chegou_em) >= de0 && new Date(l.chegou_em) < ate0);
+  const total = doPeriodo.length, ganhos = doPeriodo.filter(l => l.status === 'vendido');
   const receita = ganhos.reduce((s, l) => s + Number(l.venda_valor || 0), 0);
-  const google = leads.filter(l => l.canal === 'google');
-  const abertos = leads.filter(l => l.status === 'atendimento' || l.status === 'triagem').length;
+  const google = doPeriodo.filter(l => l.canal === 'google');
+  const abertos = doPeriodo.filter(l => l.status === 'atendimento' || l.status === 'triagem').length;
   $('#titulo').textContent = total ? `${int(total)} leads. ${int(ganhos.length)} ${ganhos.length === 1 ? 'venda' : 'vendas'}.` : 'Nenhum lead ainda.';
   $('#kpis').innerHTML = [
     ['Leads', int(total), int(google.length) + ' do Google Ads'],
@@ -148,12 +149,13 @@ function render() {
     ['Vendas do Google', int(ganhos.filter(l => l.canal === 'google').length), brl(ganhos.filter(l => l.canal === 'google').reduce((s, l) => s + Number(l.venda_valor || 0), 0))]
   ].map(([l, v, s, c]) => `<div class="card kpi ${c || ''}"><div class="caption">${l}</div><div class="v num">${v}</div><div class="s">${s}</div></div>`).join('');
 
-  const cont = { todos: total }; leads.forEach(l => cont[l.status] = (cont[l.status] || 0) + 1);
-  $('#filtros').innerHTML = ['todos', 'triagem', 'atendimento', 'vendido', 'perdido']
-    .map(k => `<button class="filtro ${filtro === k ? 'on' : ''}" data-f="${k}">${k === 'todos' ? 'Todos' : STATUS[k]}<b>${cont[k] || 0}</b></button>`).join('');
+  const cont = { todos: total, sugestao: leads.filter(l => l.sugestao).length }; leads.forEach(l => cont[l.status] = (cont[l.status] || 0) + 1);
+  $('#filtros').innerHTML = (cont.sugestao ? ['sugestao'] : []).concat(['todos', 'triagem', 'atendimento', 'vendido', 'perdido'])
+    .map(k => `<button class="filtro ${filtro === k ? 'on' : ''}" data-f="${k}">${k === 'todos' ? 'Todos' : k === 'sugestao' ? 'Venda a confirmar' : STATUS[k]}<b>${cont[k] || 0}</b></button>`).join('');
+  if (filtro === 'sugestao' && !cont.sugestao) filtro = 'todos';
 
   const q = $('#busca').value.trim().toLowerCase();
-  const vis = leads.filter(l => (filtro === 'todos' || l.status === filtro) &&
+  const vis = leads.filter(l => (filtro === 'todos' || l.status === filtro || (filtro === 'sugestao' && l.sugestao)) &&
     (!q || [l.nome, l.telefone, l.carro, l.bairro, fone(l.telefone)].some(x => String(x || '').toLowerCase().includes(q))));
   if (!vis.length) { $('#lista').innerHTML = `<div class="vazio">${total ? 'Nenhum lead com esse filtro.' : 'Nenhum lead nesse período.'}</div>`; return; }
 
@@ -172,8 +174,17 @@ function render() {
       <div class="st"><span class="pill p-${l.status}">${STATUS[l.status]}</span></div>
       <div class="valor">${valor}</div>
       <div class="acoes">${acoes}<button class="btn sm quiet" data-a="conversa" data-t="${esc(l.telefone)}">Conversa</button><a class="btn sm quiet" href="https://wa.me/${esc(l.telefone)}" target="_blank" rel="noopener">WhatsApp</a></div>
+      ${l.sugestao ? sugestaoHTML(l) : ''}
     </div>`;
   }).join('');
+}
+
+function sugestaoHTML(l) {
+  const s = l.sugestao || {};
+  const conf = { alta: 'alta', media: 'média', baixa: 'baixa' }[s.confianca] || s.confianca || '';
+  return `<div class="sug"><span class="pill p-ia">IA</span><div class="t"><b>Possível venda${s.valor ? ' de ' + brl(s.valor, 2) : ''}</b>${s.produto ? ' · ' + esc(s.produto) : ''}
+    <span class="caption"> · certeza ${esc(conf)}</span>${s.evidencia ? `<br><q>${esc(s.evidencia)}</q>` : ''}</div>
+    <div class="ac"><button class="btn sm ganho" data-a="confirmarIA" data-t="${esc(l.telefone)}">Confirmar venda</button><button class="btn sm quiet" data-a="descartarIA" data-t="${esc(l.telefone)}">Não foi venda</button></div></div>`;
 }
 
 /* ---------- ações ---------- */
@@ -181,19 +192,19 @@ const modal = (html) => { $('#raiz-modal').innerHTML = `<div class="veu" id="veu
 const fechar = () => { $('#raiz-modal').innerHTML = ''; };
 const lead = (t) => leads.find(x => x.telefone === t) || {};
 
-function ganho(t) {
+function ganho(t, sug) {
   const l = lead(t), hoje = new Date().toISOString().slice(0, 10);
-  modal(`<div class="modal"><h3>Marcar como vendido</h3><div class="sub">${esc(l.nome || fone(t))}${l.carro ? ' · ' + esc(l.carro) : ''}</div>
-    <label class="l" for="m-valor">Valor da venda</label><input id="m-valor" class="in num" inputmode="decimal" placeholder="R$ 650,00" value="">
+  const vIni = sug && sug.valor ? Number(sug.valor).toFixed(2).replace('.', ',') : '', pIni = sug && sug.produto ? sug.produto : '';
+  modal(`<div class="modal"><h3>${sug ? 'Confirmar venda lida pela IA' : 'Marcar como vendido'}</h3><div class="sub">${esc(l.nome || fone(t))}${l.carro ? ' · ' + esc(l.carro) : ''}${sug ? '<br>Confira o valor: se a venda saiu por áudio ou mudou, corrija aqui.' : ''}</div>
+    <label class="l" for="m-valor">Valor da venda</label><input id="m-valor" class="in num" inputmode="decimal" placeholder="R$ 650,00" value="${esc(vIni)}">
     <label class="l" for="m-data">Data da venda</label><input id="m-data" class="in" type="date" value="${hoje}" max="${hoje}">
-    <label class="l" for="m-obs">O que foi vendido (opcional)</label><textarea id="m-obs" class="in" placeholder="Moura 60Ah"></textarea>
+    <label class="l" for="m-obs">O que foi vendido (opcional)</label><textarea id="m-obs" class="in" placeholder="Moura 60Ah">${esc(pIni)}</textarea>
     <div class="erro" id="m-erro"></div>
     <div class="pe"><button class="btn quiet" id="m-x">Cancelar</button><button class="btn primary" id="m-ok">Salvar venda</button></div></div>`);
   $('#m-x').onclick = fechar; setTimeout(() => $('#m-valor').focus(), 60);
   $('#m-ok').onclick = () => {
-    const raw = $('#m-valor').value.trim().replace(/[R$\s]/g, '');
-    const v = Number(raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw.replace(/\.(?=\d{3}(\D|$))/g, ''));
-    if (!v || v <= 0) { $('#m-erro').textContent = 'Informe o valor da venda.'; return; }
+    const v = valorBR($('#m-valor').value);
+    if (!v) { $('#m-erro').textContent = 'Informe o valor da venda.'; return; }
     executar({ p_telefone: t, p_acao: 'vendido', p_valor: v, p_data: $('#m-data').value || null, p_motivo: $('#m-obs').value.trim() || null }, 'Venda registrada');
   };
 }
@@ -208,6 +219,8 @@ function perdido(t) {
   $('#m-ok').onclick = () => executar({ p_telefone: t, p_acao: 'perdido', p_motivo: $('#m-mot').value || null }, 'Marcado como perdido');
 }
 const reabrir = (t) => executar({ p_telefone: t, p_acao: 'reabrir' }, 'Lead reaberto');
+const confirmarIA = (t) => ganho(t, lead(t).sugestao || {});
+const descartarIA = (t) => executar({ p_telefone: t, p_acao: 'descartar_sugestao' }, 'Sugestão descartada');
 
 async function executar(args, msg) {
   const b = $('#m-ok'); if (b) b.disabled = true;
@@ -234,7 +247,7 @@ async function conversa(t) {
 
 function csv() {
   const cols = [['chegou_em', 'Chegou em'], ['loja_nome', 'Loja'], ['nome', 'Nome'], ['telefone', 'Telefone'], ['status', 'Status'], ['carro', 'Carro'], ['bairro', 'Bairro'], ['canal', 'Origem'], ['tem_gclid', 'Clique do Google'], ['venda_valor', 'Venda'], ['venda_at', 'Data da venda'], ['desfecho_motivo', 'Motivo / observação'], ['desfecho_por', 'Marcado por']];
-  const linhas = [cols.map(c => c[1]).join(';')].concat(leads.map(l => cols.map(([k]) => {
+  const linhas = [cols.map(c => c[1]).join(';')].concat(leads.filter(l => new Date(l.chegou_em) >= faixa[0] && new Date(l.chegou_em) < faixa[1]).map(l => cols.map(([k]) => {
     let v = l[k]; if (k === 'status') v = STATUS[v]; if (k === 'canal') v = CANAL[v] || v; if (k === 'tem_gclid') v = v ? 'sim' : 'não';
     if ((/_at$/.test(k) || k === 'chegou_em') && v) v = new Date(v).toLocaleString('pt-BR');
     if (typeof v === 'number') v = String(v).replace('.', ',');
@@ -255,7 +268,7 @@ Painel.iniciar('crm', (cliente, quem) => {
   $('#b-atual').onclick = carregar; $('#b-csv').onclick = csv;
   $('#lista').addEventListener('click', e => {
     const b = e.target.closest('[data-a]'); if (!b) return;
-    ({ ganho, perdido, reabrir, conversa })[b.dataset.a](b.dataset.t);
+    ({ ganho, perdido, reabrir, conversa, confirmarIA, descartarIA })[b.dataset.a](b.dataset.t);
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') fechar(); });
   setPeriodo(chave);
