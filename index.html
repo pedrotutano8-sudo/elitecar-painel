@@ -105,6 +105,7 @@
 
 <script>
 const { $, esc, brl, int, pct, dataHora, fone, STATUS, CANAL, periodo, MESES, guarda, toast } = Painel;
+let eu = {};
 let sb, leads = [], filtro = 'todos', chave = guarda.ler('periodo-crm', 'hoje'), faixa;
 const alvoInicial = new URLSearchParams(location.search).get('lead');
 
@@ -119,9 +120,9 @@ function setPeriodo(p) {
 async function carregar() {
   faixa = periodo(chave, $('#d-de').value, $('#d-ate').value);
   const rotulo = { hoje: 'Hoje', '7d': 'Últimos 7 dias', mes: MESES[faixa[0].getMonth()], mesant: MESES[faixa[0].getMonth()], custom: 'Período' }[chave];
-  $('#sobre').textContent = 'Comercial · ' + rotulo;
+  $('#sobre').textContent = 'Comercial · ' + rotulo + ((eu.lojas || []).length > 1 ? ' · ' + Painel.lojaNome(eu) : '');
   $('#lista').innerHTML = '<div class="vazio">Carregando…</div>';
-  const { data, error } = await sb.rpc('painel_leads', { p_de: faixa[0].toISOString(), p_ate: faixa[1].toISOString() });
+  const { data, error } = await sb.rpc('painel_leads', { p_de: faixa[0].toISOString(), p_ate: faixa[1].toISOString(), p_loja: Painel.loja() });
   if (error) { $('#lista').innerHTML = `<div class="vazio">Não consegui carregar: ${esc(error.message)}</div>`; return; }
   leads = data || [];
   render();
@@ -167,7 +168,7 @@ function render() {
     return `<div class="linha-l ${l.telefone === alvoInicial ? 'realce' : ''}">
       <div class="quem"><div class="n">${esc(l.nome || 'Sem nome')}</div><div class="t num">${esc(fone(l.telefone))} · ${dataHora(l.chegou_em)}</div></div>
       <div class="oque"><div class="c">${esc(l.carro || 'Carro não informado')}</div><div class="t">${esc(l.bairro || 'Bairro não informado')}</div></div>
-      <div class="nota"><div class="c">${esc(CANAL[l.canal] || l.canal)}</div><div class="s">${l.tem_gclid ? 'clique rastreado' : ''}</div></div>
+      <div class="nota"><div class="c">${esc(CANAL[l.canal] || l.canal)}</div><div class="s">${l.tem_gclid ? 'clique rastreado' : ''}</div>${!Painel.loja() && (eu.lojas || []).length > 1 ? `<span class="loja-tag">${esc(l.loja_nome || l.loja)}</span>` : ''}</div>
       <div class="st"><span class="pill p-${l.status}">${STATUS[l.status]}</span></div>
       <div class="valor">${valor}</div>
       <div class="acoes">${acoes}<button class="btn sm quiet" data-a="conversa" data-t="${esc(l.telefone)}">Conversa</button><a class="btn sm quiet" href="https://wa.me/${esc(l.telefone)}" target="_blank" rel="noopener">WhatsApp</a></div>
@@ -232,7 +233,7 @@ async function conversa(t) {
 }
 
 function csv() {
-  const cols = [['chegou_em', 'Chegou em'], ['nome', 'Nome'], ['telefone', 'Telefone'], ['status', 'Status'], ['carro', 'Carro'], ['bairro', 'Bairro'], ['canal', 'Origem'], ['tem_gclid', 'Clique do Google'], ['venda_valor', 'Venda'], ['venda_at', 'Data da venda'], ['desfecho_motivo', 'Motivo / observação'], ['desfecho_por', 'Marcado por']];
+  const cols = [['chegou_em', 'Chegou em'], ['loja_nome', 'Loja'], ['nome', 'Nome'], ['telefone', 'Telefone'], ['status', 'Status'], ['carro', 'Carro'], ['bairro', 'Bairro'], ['canal', 'Origem'], ['tem_gclid', 'Clique do Google'], ['venda_valor', 'Venda'], ['venda_at', 'Data da venda'], ['desfecho_motivo', 'Motivo / observação'], ['desfecho_por', 'Marcado por']];
   const linhas = [cols.map(c => c[1]).join(';')].concat(leads.map(l => cols.map(([k]) => {
     let v = l[k]; if (k === 'status') v = STATUS[v]; if (k === 'canal') v = CANAL[v] || v; if (k === 'tem_gclid') v = v ? 'sim' : 'não';
     if ((/_at$/.test(k) || k === 'chegou_em') && v) v = new Date(v).toLocaleString('pt-BR');
@@ -244,8 +245,9 @@ function csv() {
   a.download = `leads-${faixa[0].toISOString().slice(0, 10)}.csv`; a.click();
 }
 
-Painel.iniciar('crm', (cliente) => {
-  sb = cliente;
+Painel.iniciar('crm', (cliente, quem) => {
+  sb = cliente; eu = quem || {};
+  Painel.quandoTrocarLoja(() => carregar());
   $('#periodos').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setPeriodo(b.dataset.p); });
   $('#d-ok').onclick = carregar;
   $('#filtros').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) { filtro = b.dataset.f; render(); } });

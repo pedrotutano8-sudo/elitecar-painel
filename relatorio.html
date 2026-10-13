@@ -88,6 +88,11 @@ section.bloco{padding:72px 0;border-top:1px solid var(--border)}
       <div class="stats" id="stats" style="margin-top:32px"></div>
     </section>
 
+    <section class="bloco hidden" id="bloco-lojas">
+      <div class="eyebrow">Lojas</div><h2 class="headline">Cada unidade, lado a lado.</h2>
+      <div class="card rolagem" style="margin-top:28px"><table class="tabela" id="lojas-tab"></table></div>
+    </section>
+
     <section class="bloco">
       <div class="eyebrow">Ritmo</div><h2 class="headline">Leads por dia.</h2>
       <p class="lede">Cada coluna é um dia. O ponto verde marca dia com venda.</p>
@@ -119,7 +124,7 @@ section.bloco{padding:72px 0;border-top:1px solid var(--border)}
 <div id="dica" class="hidden"></div>
 <script>
 const { $, esc, brl, brlCurto, int, pct, duracao, periodo, MESES, guarda } = Painel;
-let sb, chave = guarda.ler('periodo-rel', '30d');
+let sb, eu = {}, chave = guarda.ler('periodo-rel', '30d');
 const barras = (el, itens, total) => {
   const max = Math.max(1, ...itens.map(i => i[1]));
   $(el).innerHTML = itens.length ? itens.map(([n, v, s]) => `<div class="barra"><div class="nome">${esc(n)}</div><div class="trilho"><div class="preench" style="width:${v / max * 100}%"></div></div><div class="num">${int(v)}<small>${s ?? pct(v, total)}</small></div></div>`).join('') : '<div class="caption" style="padding:16px 0">Sem dados no período.</div>';
@@ -127,11 +132,11 @@ const barras = (el, itens, total) => {
 async function carregar() {
   document.querySelectorAll('#periodos button').forEach(b => b.classList.toggle('on', b.dataset.p === chave));
   const [de, ate] = periodo(chave);
-  const { data: r, error } = await sb.rpc('painel_relatorio', { p_de: de.toISOString(), p_ate: ate.toISOString() });
+  const { data: r, error } = await sb.rpc('painel_relatorio', { p_de: de.toISOString(), p_ate: ate.toISOString(), p_loja: Painel.loja() });
   if (error) { $('#titulo').textContent = 'Não consegui carregar.'; $('#resumo').textContent = error.message; return; }
   const t = r.totais || {};
   const rot = { hoje: 'Hoje', '7d': 'Últimos 7 dias', '30d': 'Últimos 30 dias', mes: MESES[de.getMonth()], mesant: MESES[de.getMonth()] }[chave];
-  $('#sobre').textContent = 'Relatório · ' + rot;
+  $('#sobre').textContent = 'Relatório · ' + rot + ((eu.lojas || []).length > 1 ? ' · ' + Painel.lojaNome(eu) : '');
   $('#titulo').textContent = t.leads ? `${int(t.leads)} ${t.leads === 1 ? 'lead' : 'leads'}, ${int(t.ganhos)} ${t.ganhos === 1 ? 'venda' : 'vendas'}.` : 'Nenhum lead no período.';
   const pl = (n, um, varios) => `${int(n)} ${n === 1 ? um : varios}`;
   $('#resumo').textContent = t.leads ? `${brl(t.receita)} em vendas. ${pl(t.google, 'lead veio', 'leads vieram')} do Google Ads e ${pl(t.ganhos_google, 'virou venda', 'viraram venda')} (${brl(t.receita_google)}).` : '';
@@ -141,6 +146,12 @@ async function carregar() {
     [brlCurto(t.receita), 'Receita', t.ganhos ? 'ticket ' + brl(t.receita / t.ganhos) : '—'],
     [t.resp_mediana_seg != null ? duracao(t.resp_mediana_seg) : '—', 'Resposta da equipe', 'mediana até a 1ª resposta']
   ].map(([v, r2, c]) => `<div class="card stat"><div class="v num">${v}</div><div class="r">${r2}</div><div class="c">${c}</div></div>`).join('');
+  // lojas lado a lado (só na visão de todas as lojas)
+  const pls = r.por_loja || [];
+  $('#bloco-lojas').classList.toggle('hidden', !!Painel.loja() || pls.length < 2);
+  $('#lojas-tab').innerHTML = '<tr><th>Loja</th><th class="d">Leads</th><th class="d">Do Google</th><th class="d">Vendas</th><th class="d">Conversão</th><th class="d">Ticket médio</th><th class="d">Receita</th></tr>'
+    + pls.map(l => `<tr><td>${esc(l.nome)}${l.ativa ? '' : ' <span class="caption">· em breve</span>'}</td><td class="d num">${int(l.leads)}</td><td class="d num">${int(l.google)}</td><td class="d num">${int(l.ganhos)}</td><td class="d num">${pct(l.ganhos, l.leads, 1)}</td><td class="d num">${l.ganhos ? brl(l.receita / l.ganhos) : '—'}</td><td class="d num">${brl(l.receita)}</td></tr>`).join('')
+    + (pls.length > 1 ? `<tr class="total"><td><b>Total</b></td><td class="d num"><b>${int(t.leads)}</b></td><td class="d num"><b>${int(t.google)}</b></td><td class="d num"><b>${int(t.ganhos)}</b></td><td class="d num"><b>${pct(t.ganhos, t.leads, 1)}</b></td><td class="d num"><b>${t.ganhos ? brl(t.receita / t.ganhos) : '—'}</b></td><td class="d num"><b>${brl(t.receita)}</b></td></tr>` : '');
   // dias
   const dias = r.por_dia || [], maxd = Math.max(1, ...dias.map(d => d.leads));
   $('#dias').innerHTML = dias.map(d => `<div class="coluna" data-d="${d.dia}" data-l="${d.leads}" data-g="${d.ganhos}" data-r="${d.receita}"><div class="b" style="height:${d.leads / maxd * 100}%"></div>${d.ganhos ? '<i class="venda" style="bottom:calc(' + (d.leads / maxd * 100) + '% + 6px)"></i>' : ''}</div>`).join('') || '<div class="caption">Sem dados.</div>';
@@ -166,8 +177,9 @@ document.addEventListener('mousemove', e => {
   d.innerHTML = c.dataset.d ? `<b>${c.dataset.d.split('-').reverse().join('/')}</b><br>${c.dataset.l} leads · ${c.dataset.g} vendas${Number(c.dataset.r) ? ' · ' + brl(c.dataset.r) : ''}` : `<b>${c.dataset.h}h</b><br>${c.dataset.v} leads`;
   d.style.left = Math.min(e.clientX + 14, innerWidth - d.offsetWidth - 10) + 'px'; d.style.top = (e.clientY + 14) + 'px'; d.classList.remove('hidden');
 });
-Painel.iniciar('relatorio', (cliente) => {
-  sb = cliente;
+Painel.iniciar('relatorio', (cliente, quem) => {
+  sb = cliente; eu = quem || {};
+  Painel.quandoTrocarLoja(() => carregar());
   $('#periodos').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { chave = b.dataset.p; guarda.gravar('periodo-rel', chave); carregar(); } });
   carregar();
 });

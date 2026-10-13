@@ -83,8 +83,31 @@
         <a href="relatorio.html" class="${pagina === 'relatorio' ? 'on' : ''}">Relatório</a>
       </nav>
       <button class="sair" id="b-sair" title="${esc(nome || '')}">Sair</button>
-    </div></header>`;
+    </div><div class="wrap barra-lojas hidden" id="barra-lojas"><span class="caption">Unidade</span><div class="seg" id="lojas" role="tablist" aria-label="Unidade"></div></div></header>`;
   }
+
+  // ---------- unidade (loja) ----------
+  // null = todas as lojas que o usuário pode ver. Guarda a escolha neste navegador.
+  let lojaAtual = null, aoTrocarLoja = null;
+  function montarLojas(eu) {
+    const lojas = (eu && eu.lojas) || [];
+    const ativas = lojas.filter(l => l.ativa);
+    const salva = guarda.ler('loja', 'todas');
+    lojaAtual = ativas.some(l => l.slug === salva) ? salva : (ativas.length === 1 ? ativas[0].slug : null);
+    if (lojas.length < 2) return;
+    const btn = (slug, nome, off) => `<button data-l="${esc(slug)}" class="${(lojaAtual || 'todas') === slug ? 'on' : ''}" ${off ? 'disabled title="Ainda não abriu"' : ''}>${esc(nome)}${off ? ' · em breve' : ''}</button>`;
+    $('#lojas').innerHTML = (ativas.length > 1 ? btn('todas', 'Todas as lojas') : '') + lojas.map(l => btn(l.slug, l.nome, !l.ativa)).join('');
+    $('#barra-lojas').classList.remove('hidden');
+    $('#lojas').addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b || b.disabled) return;
+      lojaAtual = b.dataset.l === 'todas' ? null : b.dataset.l; guarda.gravar('loja', b.dataset.l);
+      document.querySelectorAll('#lojas button').forEach(x => x.classList.toggle('on', x === b));
+      if (aoTrocarLoja) aoTrocarLoja(lojaAtual);
+    });
+  }
+  const loja = () => lojaAtual;
+  const lojaNome = (eu) => { const l = ((eu && eu.lojas) || []).find(x => x.slug === lojaAtual); return l ? l.nome : 'Todas as lojas'; };
+  const quandoTrocarLoja = (fn) => { aoTrocarLoja = fn; };
 
   async function iniciar(pagina, aoEntrar) {
     if (!window.supabase) { document.body.textContent = 'Não consegui carregar a biblioteca do banco. Recarregue a página.'; return; }
@@ -94,10 +117,11 @@
     const { data: eu, error } = await sb.rpc('painel_eu');
     if (error) { await sb.auth.signOut(); return telaLogin('Esse e-mail não tem acesso ao painel.'); }
     document.body.insertAdjacentHTML('afterbegin', nav(pagina, eu && eu.nome));
+    montarLojas(eu);
     $('#b-sair').onclick = async () => { await sb.auth.signOut(); location.reload(); };
     document.getElementById('app').classList.remove('hidden');
     aoEntrar(sb, eu || {});
   }
 
-  window.Painel = { $, esc, brl, brlCurto, int, pct, dataHora, data, fone, duracao, periodo, MESES, STATUS, CANAL, MARCA, guarda, toast, iniciar };
+  window.Painel = { $, esc, brl, brlCurto, int, pct, dataHora, data, fone, duracao, periodo, MESES, STATUS, CANAL, MARCA, guarda, toast, iniciar, loja, lojaNome, quandoTrocarLoja };
 })();

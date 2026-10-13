@@ -106,3 +106,9 @@ label.l{display:block;font-size:13px;color:var(--text-2);margin:14px 0 6px}
 .toast{--tx:-50%}
 @keyframes entra{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* unidade */
+.barra-lojas{display:flex;align-items:center;gap:10px;height:auto;padding-top:0;padding-bottom:10px}
+.barra-lojas .caption{white-space:nowrap}
+.seg button:disabled{opacity:.45;cursor:default}
+.loja-tag{display:inline-block;font-size:11px;color:var(--text-2);border:1px solid var(--border);border-radius:980px;padding:1px 8px;margin-top:4px}
