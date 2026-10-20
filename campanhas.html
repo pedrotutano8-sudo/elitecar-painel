@@ -41,6 +41,12 @@ section.bloco{padding:56px 0;border-top:1px solid var(--border)}
 .aviso b{color:var(--text)}
 #dica{position:fixed;z-index:50;pointer-events:none;background:var(--elevated);border:1px solid var(--border);box-shadow:var(--shadow-md);border-radius:var(--r-md);padding:8px 12px;font-size:13px;white-space:nowrap}
 .fim{margin:24px 0 64px;line-height:1.7}
+.dupla{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:24px}.dupla>div{min-width:0}
+@media (max-width:900px){.dupla{grid-template-columns:minmax(0,1fr)}}
+.subt{font-size:15px;font-weight:600;margin:0 0 10px}
+.tabela td.v-bom{color:var(--ok);font-weight:600}.tabela td.v-ruim{color:var(--bad)}
+.tag-m{display:inline-block;font-size:11px;padding:1px 7px;border-radius:980px;background:var(--neutral-soft);color:var(--text-2);margin-left:6px;vertical-align:1px}
+.vazio{padding:22px 20px;font-size:14px;color:var(--text-3)}
 </style>
 </head>
 <body>
@@ -74,12 +80,34 @@ section.bloco{padding:56px 0;border-top:1px solid var(--border)}
       <div class="eyebrow">Campanhas</div><h2 class="headline">Uma por uma.</h2>
       <div class="card rolagem" style="margin-top:24px"><table class="tabela" id="camp-tab"></table></div>
     </section>
+
+    <section class="bloco">
+      <div class="eyebrow">Palavras-chave</div><h2 class="headline" id="h-pal">O que vende.</h2>
+      <p class="lede" id="l-pal">Cada palavra-chave com o que custou e o que vendeu. A venda conta pelo Google (venda importada pelo clique) ou pelo CRM (lead de WhatsApp que veio com a palavra no link), o que for maior.</p>
+      <div id="pal-avisos"></div>
+      <div class="card rolagem" style="margin-top:24px"><table class="tabela" id="pal-tab"></table></div>
+    </section>
+
+    <section class="bloco">
+      <div class="eyebrow">Grupos de anúncio</div><h2 class="headline" id="h-gru">Grupo por grupo.</h2>
+      <div class="card rolagem" style="margin-top:24px"><table class="tabela" id="gru-tab"></table></div>
+    </section>
+
+    <section class="bloco">
+      <div class="eyebrow">Termos de pesquisa</div><h2 class="headline" id="h-ter">O que as pessoas digitaram.</h2>
+      <p class="lede" id="l-ter">Termos reais de pesquisa dos últimos 30 dias (o Google só libera esse dado em janela fixa). Os que gastam e não vendem são candidatos a palavra negativa.</p>
+      <div class="dupla">
+        <div><div class="subt">Termos que venderam</div><div class="card rolagem"><table class="tabela" id="ter-ok"></table></div></div>
+        <div><div class="subt">Gastam e não vendem (candidatos a negativar)</div><div class="card rolagem"><table class="tabela" id="ter-ruim"></table></div></div>
+      </div>
+    </section>
     <p class="caption fim">
       <b>Leads do Google</b> = conversas de WhatsApp que vieram de clique em anúncio + ligações atendidas dos anúncios.
       <b>Vendas do Google</b> = vendas desses WhatsApps + ligações marcadas como venda.
       <b>CPL</b> = investimento ÷ leads do Google. <b>Custo por venda</b> = investimento ÷ vendas do Google.
       <b>Retorno</b> = receita das vendas do Google ÷ investimento (faturamento, não lucro).
       Investimento, cliques e impressões vêm do Google Ads de hora em hora.
+      <b>Palavras-chave e grupos</b>: custo e cliques do Google Ads; vendas pelo Google (venda importada pelo clique) ou pelo CRM (palavra que veio no link do clique), o que for maior, porque as duas contam a mesma venda.
     </p>
   </div>
 </main>
@@ -156,6 +184,7 @@ async function carregar() {
     + lojas.map(l => linhaLoja(l.nome, l)).join('') + (lojas.length > 1 ? linhaLoja('Total', t, true) : '');
 
   const cs = r.campanhas || [], varias = !Painel.loja() && lojas.length > 1;
+  carregarPalavras(de, ate, varias);
   $('#camp-tab').innerHTML = cs.length ? '<tr><th>Campanha</th><th>Status</th><th class="d">Impressões</th><th class="d">Cliques</th><th class="d">CTR</th><th class="d">CPC</th><th class="d">Investimento</th><th class="d">Ligações</th><th class="d">Conv. Google</th></tr>'
     + cs.map(c => `<tr><td class="nome">${esc(c.nome)}<span class="s">${esc(TIPO[c.tipo] || c.tipo || '')}${c.orcamento_dia ? ' · ' + brl(c.orcamento_dia) + '/dia' : ''}${varias ? ' · ' + esc(c.loja_nome) : ''}</span></td>
       <td><span class="pill p-${esc(c.status || 'PAUSED')}">${STATUS_C[c.status] || esc(c.status || '—')}</span></td>
@@ -163,6 +192,48 @@ async function carregar() {
       <td class="d num">${din(div(c.custo, c.cliques))}</td><td class="d num">${brl(c.custo, 2)}</td>
       <td class="d num">${int(c.ligacoes)}${c.ligacoes ? ` <span class="caption">(${int(c.ligacoes_atendidas)} atend.)</span>` : ''}</td><td class="d num">${Number(c.conv_google).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</td></tr>`).join('')
     : '<tr><td class="caption" style="padding:24px 20px">Nenhuma campanha com impressão no período.</td></tr>';
+}
+// ===================================================== palavras-chave, grupos e termos
+const CORR = { EXACT: 'exata', PHRASE: 'frase', BROAD: 'ampla' };
+async function carregarPalavras(de, ate, varias) {
+  const { data: r, error } = await sb.rpc('painel_palavras', { p_de: de.toISOString(), p_ate: ate.toISOString(), p_loja: Painel.loja() });
+  if (error) { $('#pal-tab').innerHTML = `<tr><td class="vazio">Não consegui carregar: ${esc(error.message)}</td></tr>`; return; }
+  const pal = r.palavras || [], gru = r.grupos || [];
+  const avisos = [];
+  if (!r.tem_google) avisos.push('<b>Falta o script novo do Google Ads.</b> Sem ele, custo e cliques por palavra-chave e as vendas que o Google atribuiu não aparecem. Por enquanto a tabela mostra só o que veio do CRM.');
+  (r.sem_rastreio || []).forEach(x => { if (x.sem_palavra / x.leads >= 0.3) avisos.push(`<b>${esc(x.nome)}: ${int(x.sem_palavra)} de ${int(x.leads)} leads do Google chegaram sem a palavra-chave no link.</b> Falta o sufixo de rastreamento na conta dessa loja.`); });
+  $('#pal-avisos').innerHTML = avisos.map(a => `<div class="card aviso">${a}</div>`).join('');
+
+  const totV = pal.reduce((s, x) => s + Number(x.vendas || 0), 0);
+  const top = pal.filter(x => Number(x.vendas) > 0).sort((a, b) => b.receita - a.receita)[0];
+  $('#h-pal').textContent = top ? `"${top.palavra}" lidera: ${int(top.vendas)} ${Number(top.vendas) === 1 ? 'venda' : 'vendas'}, ${brlCurto(top.receita)}.` : (pal.length ? 'Nenhuma venda atribuída a palavra-chave no período.' : 'O que vende.');
+  const cls = (x) => Number(x.vendas) > 0 ? (x.custo > 0 && x.receita / x.custo >= 1 ? 'v-bom' : '') : (x.custo >= 100 ? 'v-ruim' : '');
+  const linhaP = (x) => `<tr><td class="nome">${esc(x.palavra)}${x.correspondencia ? `<span class="tag-m">${esc(String(x.correspondencia).split(',').map(m => CORR[m] || m.toLowerCase()).join(' / '))}</span>` : ''}<span class="s">${esc(x.grupos || (x.no_google ? '' : 'só no CRM'))}${varias ? ' · ' + esc(x.loja) : ''}</span></td>
+    <td class="d num">${int(x.cliques)}</td><td class="d num">${brl(x.custo, 2)}</td><td class="d num">${int(x.leads_whats)}</td>
+    <td class="d num ${cls(x)}">${int(x.vendas)}</td><td class="d num">${x.receita ? brl(x.receita) : '—'}</td>
+    <td class="d num">${din(Number(x.vendas) ? x.custo / x.vendas : null)}</td><td class="d num ${cls(x)}">${x.custo ? vezes(x.receita / x.custo) : '—'}</td></tr>`;
+  $('#pal-tab').innerHTML = pal.length ? '<tr><th>Palavra-chave</th><th class="d">Cliques</th><th class="d">Custo</th><th class="d">Leads WhatsApp</th><th class="d">Vendas</th><th class="d">Receita</th><th class="d">Custo/venda</th><th class="d">Retorno</th></tr>' + pal.map(linhaP).join('')
+    : '<tr><td class="vazio">Sem palavras-chave com custo ou lead no período.</td></tr>';
+
+  const topG = gru.filter(x => Number(x.vendas) > 0).sort((a, b) => b.receita - a.receita)[0];
+  $('#h-gru').textContent = topG ? `${topG.grupo}: ${int(topG.vendas)} ${Number(topG.vendas) === 1 ? 'venda' : 'vendas'}, ${brlCurto(topG.receita)}.` : 'Grupo por grupo.';
+  $('#gru-tab').innerHTML = gru.length ? '<tr><th>Grupo de anúncio</th><th class="d">Cliques</th><th class="d">Custo</th><th class="d">Leads WhatsApp</th><th class="d">Vendas</th><th class="d">Receita</th><th class="d">Custo/venda</th><th class="d">Retorno</th></tr>'
+    + gru.map(x => `<tr><td class="nome">${esc(x.grupo)}<span class="s">${esc(x.campanha || '')}${varias ? ' · ' + esc(x.loja) : ''}</span></td>
+      <td class="d num">${int(x.cliques)}</td><td class="d num">${brl(x.custo, 2)}</td><td class="d num">${int(x.leads_whats)}</td>
+      <td class="d num ${cls(x)}">${int(x.vendas)}</td><td class="d num">${x.receita ? brl(x.receita) : '—'}</td>
+      <td class="d num">${din(Number(x.vendas) ? x.custo / x.vendas : null)}</td><td class="d num ${cls(x)}">${x.custo ? vezes(x.receita / x.custo) : '—'}</td></tr>`).join('')
+    : '<tr><td class="vazio">Os grupos aparecem depois que o script novo do Google Ads rodar.</td></tr>';
+
+  const tp = r.termos_periodo || {}, fmt = s => s ? String(s).slice(8, 10) + '/' + String(s).slice(5, 7) : '';
+  $('#l-ter').textContent = 'Termos reais de pesquisa' + (tp.de ? ` de ${fmt(tp.de)} a ${fmt(tp.ate)}` : ' dos últimos 30 dias') + ' (o Google só libera esse dado em janela fixa, não muda com o filtro de período). Os que gastam e não vendem são candidatos a palavra negativa.';
+  const tv = r.termos_vendem || [], tg = r.termos_gastam || [];
+  $('#h-ter').textContent = tg.length ? `${brl(tg.reduce((s, x) => s + Number(x.custo), 0))} em termos que não venderam.` : 'O que as pessoas digitaram.';
+  $('#ter-ok').innerHTML = tv.length ? '<tr><th>Termo</th><th class="d">Custo</th><th class="d">Vendas</th><th class="d">Receita</th></tr>'
+    + tv.map(x => `<tr><td class="nome">${esc(x.termo)}<span class="s">${esc(x.grupo || '')}</span></td><td class="d num">${brl(x.custo, 2)}</td><td class="d num v-bom">${Number(x.vendas_google).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</td><td class="d num">${brl(x.receita_google)}</td></tr>`).join('')
+    : '<tr><td class="vazio">Nenhum termo com venda atribuída ainda.</td></tr>';
+  $('#ter-ruim').innerHTML = tg.length ? '<tr><th>Termo</th><th class="d">Cliques</th><th class="d">Custo</th><th class="d">Conv. Google</th></tr>'
+    + tg.map(x => `<tr><td class="nome">${esc(x.termo)}<span class="s">${esc(x.grupo || '')}</span></td><td class="d num">${int(x.cliques)}</td><td class="d num v-ruim">${brl(x.custo, 2)}</td><td class="d num">${Number(x.conv_google).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</td></tr>`).join('')
+    : '<tr><td class="vazio">Os termos aparecem depois que o script novo do Google Ads rodar.</td></tr>';
 }
 document.addEventListener('mousemove', e => {
   const c = e.target.closest && e.target.closest('.coluna'), d = $('#dica');
