@@ -34,6 +34,13 @@
 .filtro.on{background:var(--text);border-color:var(--text);color:var(--bg);font-weight:600}
 .filtro.on b{color:var(--bg);opacity:.6}
 .busca{flex:1;min-width:200px}
+.canais{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:-12px 0 22px}
+.canais .rot{font-size:12px;color:var(--text-3);margin-right:2px}
+.canal{height:34px;padding:0 14px;border-radius:980px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);font-size:13px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;transition:all .2s var(--ease)}
+.canal b{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+.canal i{font-style:normal;font-size:12px;color:var(--text-3)}
+.canal.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.canal.on b,.canal.on i{color:#fff}
 .busca .in{height:36px;border-radius:980px;font-size:14px}
 
 .lista{overflow:hidden}
@@ -89,6 +96,7 @@
     </section>
 
     <section class="kpis" id="kpis"></section>
+    <section class="canais" id="canais" aria-label="Leads por origem"></section>
 
     <section class="ferramentas">
       <div class="filtros" id="filtros"></div>
@@ -106,7 +114,7 @@
 <script>
 const { $, esc, brl, int, pct, dataHora, fone, STATUS, CANAL, periodo, MESES, guarda, toast, valorBR } = Painel;
 let eu = {};
-let sb, leads = [], filtro = 'todos', chave = guarda.ler('periodo-crm', 'hoje'), faixa;
+let sb, todos = [], leads = [], filtro = 'todos', canal = guarda.ler('canal-crm', ''), chave = guarda.ler('periodo-crm', 'hoje'), faixa;
 const alvoInicial = new URLSearchParams(location.search).get('lead');
 
 function setPeriodo(p) {
@@ -124,22 +132,35 @@ async function carregar() {
   $('#lista').innerHTML = '<div class="vazio">Carregando…</div>';
   const { data, error } = await sb.rpc('painel_leads', { p_de: faixa[0].toISOString(), p_ate: faixa[1].toISOString(), p_loja: Painel.loja() });
   if (error) { $('#lista').innerHTML = `<div class="vazio">Não consegui carregar: ${esc(error.message)}</div>`; return; }
-  leads = data || [];
+  todos = data || [];
   render();
   if (alvoInicial && !carregar._abriu) {
     carregar._abriu = true;
-    if (leads.some(l => l.telefone === alvoInicial)) { $('#busca').value = alvoInicial; render(); conversa(alvoInicial); }
+    if (todos.some(l => l.telefone === alvoInicial)) { canal = ''; $('#busca').value = alvoInicial; render(); conversa(alvoInicial); }
     else toast('Esse lead não está no período selecionado.');
   }
 }
 
+// origem do lead: chips com leads e vendas de cada canal no período; clicar filtra números e lista
+function renderCanais() {
+  const [de0, ate0] = faixa, per = todos.filter(l => new Date(l.chegou_em) >= de0 && new Date(l.chegou_em) < ate0);
+  const por = {}; per.forEach(l => { const k = l.canal || 'organico'; (por[k] = por[k] || { n: 0, v: 0 }).n++; if (l.status === 'vendido') por[k].v++; });
+  if (canal && !por[canal]) por[canal] = { n: 0, v: 0 };
+  const ordem = Object.keys(por).sort((a, b) => por[b].n - por[a].n);
+  const vendas = per.filter(l => l.status === 'vendido').length;
+  const chip = (k, rot, n, v) => `<button class="canal ${canal === k ? 'on' : ''}" data-c="${esc(k)}">${esc(rot)} <b>${int(n)}</b><i>${k && n ? pct(n, per.length, 0) + ' · ' : ''}${int(v)} ${v === 1 ? 'venda' : 'vendas'}</i></button>`;
+  $('#canais').innerHTML = `<span class="rot">Origem</span>` + chip('', 'Todas', per.length, vendas) + ordem.map(k => chip(k, CANAL[k] || k, por[k].n, por[k].v)).join('');
+}
+
 function render() {
+  renderCanais();
+  leads = canal ? todos.filter(l => (l.canal || 'organico') === canal) : todos;
   const [de0, ate0] = faixa, doPeriodo = leads.filter(l => new Date(l.chegou_em) >= de0 && new Date(l.chegou_em) < ate0);
   const total = doPeriodo.length, ganhos = doPeriodo.filter(l => l.status === 'vendido');
   const receita = ganhos.reduce((s, l) => s + Number(l.venda_valor || 0), 0);
   const google = doPeriodo.filter(l => l.canal === 'google');
   const abertos = doPeriodo.filter(l => l.status === 'atendimento' || l.status === 'triagem').length;
-  $('#titulo').textContent = total ? `${int(total)} leads. ${int(ganhos.length)} ${ganhos.length === 1 ? 'venda' : 'vendas'}.` : 'Nenhum lead ainda.';
+  $('#titulo').textContent = total ? `${int(total)} leads${canal ? ' do ' + (CANAL[canal] || canal) : ''}. ${int(ganhos.length)} ${ganhos.length === 1 ? 'venda' : 'vendas'}.` : (canal ? 'Nenhum lead desse canal.' : 'Nenhum lead ainda.');
   $('#kpis').innerHTML = [
     ['Leads', int(total), int(google.length) + ' do Google Ads'],
     ['Em aberto', int(abertos), 'sem venda marcada'],
@@ -200,7 +221,7 @@ function situacaoHTML(l) {
 /* ---------- ações ---------- */
 const modal = (html) => { $('#raiz-modal').innerHTML = `<div class="veu" id="veu">${html}</div>`; $('#veu').addEventListener('click', e => { if (e.target.id === 'veu') fechar(); }); };
 const fechar = () => { $('#raiz-modal').innerHTML = ''; };
-const lead = (t) => leads.find(x => x.telefone === t) || {};
+const lead = (t) => todos.find(x => x.telefone === t) || {};
 
 function ganho(t, sug) {
   const l = lead(t), hoje = new Date().toISOString().slice(0, 10);
@@ -276,6 +297,7 @@ Painel.iniciar('crm', (cliente, quem) => {
   $('#periodos').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setPeriodo(b.dataset.p); });
   $('#d-ok').onclick = carregar;
   $('#filtros').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) { filtro = b.dataset.f; render(); } });
+  $('#canais').addEventListener('click', e => { const b = e.target.closest('[data-c]'); if (b) { canal = b.dataset.c; guarda.gravar('canal-crm', canal); render(); } });
   $('#busca').addEventListener('input', render);
   $('#b-atual').onclick = carregar; $('#b-csv').onclick = csv;
   $('#lista').addEventListener('click', e => {
