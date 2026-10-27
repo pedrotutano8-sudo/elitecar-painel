@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Campanhas</title>
+<link rel="stylesheet" href="comum.css">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="comum.js"></script>
+<style>
+.hero{padding:72px 0 40px}
+.hero .controle{margin-top:24px}
+section.bloco{padding:56px 0;border-top:1px solid var(--border)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:28px}
+.stat{padding:22px 20px}
+.stat .v{font-size:clamp(28px,3.6vw,40px);font-weight:700;letter-spacing:-.03em;line-height:1.05}
+.stat .r{font-size:15px;color:var(--text);margin-top:8px}
+.stat .c{font-size:13px;color:var(--text-3);margin-top:4px}
+.stat.bom .v{color:var(--ok)}.stat.ruim .v{color:var(--bad)}
+@media (max-width:900px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:480px){.stats{gap:10px}.stat{padding:16px 14px}}
+.tabela{width:100%;border-collapse:collapse;font-size:14px}
+.tabela th{font-size:12px;font-weight:400;color:var(--text-3);text-align:left;padding:12px 16px;border-bottom:1px solid var(--border);white-space:nowrap}
+.tabela td{padding:13px 16px;border-bottom:1px solid var(--border);white-space:nowrap}
+.tabela tr:last-child td{border-bottom:0}
+.tabela .d{text-align:right}
+.tabela td.nome{white-space:normal;min-width:180px}
+.tabela td.nome .s{display:block;font-size:12px;color:var(--text-3)}
+.rolagem{overflow-x:auto}
+.p-ENABLED{background:var(--ok-soft);color:var(--ok)}
+.p-PAUSED{background:var(--neutral-soft);color:var(--text-2)}
+.p-REMOVED{background:var(--bad-soft);color:var(--bad)}
+.colunas{display:flex;align-items:flex-end;gap:3px;height:160px;padding:24px 24px 0}
+.coluna{flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%}
+.coluna .b{background:var(--accent);border-radius:4px 4px 0 0;min-height:2px}
+.coluna:hover .b{opacity:.75}
+.eixo{display:flex;justify-content:space-between;padding:8px 24px 18px;border-top:1px solid var(--border);font-size:12px;color:var(--text-3)}
+.aviso{padding:16px 20px;margin-top:20px;font-size:14px;line-height:1.5;color:var(--text-2)}
+.aviso b{color:var(--text)}
+#dica{position:fixed;z-index:50;pointer-events:none;background:var(--elevated);border:1px solid var(--border);box-shadow:var(--shadow-md);border-radius:var(--r-md);padding:8px 12px;font-size:13px;white-space:nowrap}
+.fim{margin:24px 0 64px;line-height:1.7}
+.dupla{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:24px}.dupla>div{min-width:0}
+@media (max-width:900px){.dupla{grid-template-columns:minmax(0,1fr)}}
+.subt{font-size:15px;font-weight:600;margin:0 0 10px}
+.tabela td.v-bom{color:var(--ok);font-weight:600}.tabela td.v-ruim{color:var(--bad)}
+.tag-m{display:inline-block;font-size:11px;padding:1px 7px;border-radius:980px;background:var(--neutral-soft);color:var(--text-2);margin-left:6px;vertical-align:1px}
+.tabela td.nome .s .dup{color:var(--warn,#b7791f);font-weight:500;cursor:help}
+.vazio{padding:22px 20px;font-size:14px;color:var(--text-3)}
+</style>
+</head>
+<body>
+<main id="app" class="hidden">
+  <div class="wrap">
+    <section class="hero">
+      <div class="eyebrow" id="sobre">Campanhas</div>
+      <h1 class="display" id="titulo">Carregando…</h1>
+      <p class="lede" id="resumo"></p>
+      <div class="controle seg" id="periodos"><button data-p="hoje">Hoje</button><button data-p="7d">7 dias</button><button data-p="30d">30 dias</button><button data-p="mes">Este mês</button><button data-p="mesant">Mês passado</button></div>
+      <div id="avisos"></div>
+    </section>
+
+    <section class="bloco">
+      <div class="eyebrow">Retorno</div><h2 class="headline">Quanto o Google trouxe.</h2>
+      <div class="stats" id="retorno"></div>
+    </section>
+
+    <section class="bloco">
+      <div class="eyebrow">Mídia</div><h2 class="headline">Investimento e alcance.</h2>
+      <div class="stats" id="midia"></div>
+      <div class="card" style="margin-top:20px"><div class="colunas" id="dias"></div><div class="eixo" id="eixo"></div></div>
+    </section>
+
+    <section class="bloco hidden" id="bloco-lojas">
+      <div class="eyebrow">Lojas</div><h2 class="headline">Cada unidade, lado a lado.</h2>
+      <div class="card rolagem" style="margin-top:24px"><table class="tabela" id="lojas-tab"></table></div>
+    </section>
+
+    <section class="bloco">
+      <div class="eyebrow">Campanhas</div><h2 class="headline">Uma por uma.</h2>
+      <div class="card rolagem" style="margin-top:24px"><table class="tabela" id="camp-tab"></table></div>
+    </section>
+
+    <section class="bloco">
+      <div class="eyebrow">Palavras-chave</div><h2 class="headline" id="h-pal">O que vende.</h2>
+      <p class="lede" id="l-pal">Cada palavra-chave com o que custou e o que vendeu. A venda conta pelo Google (venda importada pelo clique) ou pelo CRM (lead de WhatsApp que veio com a palavra no link), o que for maior.</p>
+      <div id="pal-avisos"></div>
+      <div class="card rolagem" style="margin-top:24px"><table class="tabela" id="pal-tab"></table></div>
+    </section>
+
+    <section class="bloco">
+      <div class="eyebrow">Grupos de anúncio</div><h2 class="headline" id="h-gru">Grupo por grupo.</h2>
+      <div class="card rolagem" style="margin-top:24px"><table class="tabela" id="gru-tab"></table></div>
+    </section>
+
+    <section class="bloco">
+      <div class="eyebrow">Termos de pesquisa</div><h2 class="headline" id="h-ter">O que as pessoas digitaram.</h2>
+      <p class="lede" id="l-ter">Termos reais de pesquisa dos últimos 30 dias (o Google só libera esse dado em janela fixa). Os que gastam e não vendem são candidatos a palavra negativa.</p>
+      <div class="dupla">
+        <div><div class="subt">Termos que venderam</div><div class="card rolagem"><table class="tabela" id="ter-ok"></table></div></div>
+        <div><div class="subt">Gastam e não vendem (candidatos a negativar)</div><div class="card rolagem"><table class="tabela" id="ter-ruim"></table></div></div>
+      </div>
+    </section>
+    <p class="caption fim">
+      <b>Leads do Google</b> = conversas de WhatsApp que vieram de clique em anúncio + ligações atendidas dos anúncios.
+      <b>Vendas do Google</b> = vendas desses WhatsApps + ligações marcadas como venda.
+      <b>CPL</b> = investimento ÷ leads do Google. <b>Custo por venda</b> = investimento ÷ vendas do Google.
+      <b>Retorno</b> = receita das vendas do Google ÷ investimento (faturamento, não lucro).
+      Investimento, cliques e impressões vêm do Google Ads de hora em hora.
+      <b>Palavras-chave e grupos</b>: custo e cliques do Google Ads; vendas pelo Google (venda importada pelo clique) ou pelo CRM (palavra que veio no link do clique), o que for maior, porque as duas contam a mesma venda.
+    </p>
+  </div>
+</main>
+<div id="dica" class="hidden"></div>
+<script>
+const { $, esc, brl, brlCurto, int, pct, dataHora, periodo, MESES, guarda } = Painel;
+let sb, eu = {}, chave = guarda.ler('periodo-camp', '30d');
+const div = (a, b) => b ? a / b : null;
+const vezes = (v) => v == null ? '—' : v.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'x';
+const pct1 = (v) => v == null ? '—' : (v * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%';
+const din = (v, d = 2) => v == null ? '—' : brl(v, d);
+const TIPO = { SEARCH: 'Pesquisa', PERFORMANCE_MAX: 'Performance Max', DISPLAY: 'Display', VIDEO: 'Vídeo', SMART: 'Inteligente', LOCAL: 'Local', DEMAND_GEN: 'Geração de demanda' };
+const STATUS_C = { ENABLED: 'Ativa', PAUSED: 'Pausada', REMOVED: 'Removida' };
+
+function soma(lojas) {
+  const t = {}; ['impressoes', 'cliques', 'custo', 'conv_google', 'leads', 'leads_whats_google', 'ligacoes', 'ligacoes_atendidas', 'ligacoes_a_marcar',
+    'vendas', 'vendas_whats_google', 'vendas_ligacao', 'receita', 'receita_google'].forEach(k => t[k] = lojas.reduce((s, l) => s + Number(l[k] || 0), 0));
+  return t;
+}
+function contas(t) {
+  const leadsG = t.leads_whats_google + t.ligacoes_atendidas, vendasG = t.vendas_whats_google + t.vendas_ligacao;
+  const leadsTot = t.leads + t.ligacoes_atendidas, vendasTot = t.vendas + t.vendas_ligacao;
+  return { leadsG, vendasG, cpl: div(t.custo, leadsG), cpv: div(t.custo, vendasG), roas: div(t.receita_google, t.custo),
+           roi: t.custo ? (t.receita_google - t.custo) / t.custo : null, ctr: div(t.cliques, t.impressoes), cpc: div(t.custo, t.cliques),
+           atend: div(t.ligacoes_atendidas, t.ligacoes), conv: div(vendasTot, leadsTot), ticket: div(t.receita, vendasTot) };
+}
+
+async function carregar() {
+  document.querySelectorAll('#periodos button').forEach(b => b.classList.toggle('on', b.dataset.p === chave));
+  const [de, ate] = periodo(chave);
+  const rot = { hoje: 'Hoje', '7d': 'Últimos 7 dias', '30d': 'Últimos 30 dias', mes: MESES[de.getMonth()], mesant: MESES[de.getMonth()] }[chave];
+  $('#sobre').textContent = 'Google Ads · ' + rot + ((eu.lojas || []).length > 1 ? ' · ' + Painel.lojaNome(eu) : '');
+  const { data: r, error } = await sb.rpc('painel_ads', { p_de: de.toISOString(), p_ate: ate.toISOString(), p_loja: Painel.loja() });
+  if (error) { $('#titulo').textContent = 'Não consegui carregar.'; $('#resumo').textContent = error.message; return; }
+  const lojas = r.por_loja || [], t = soma(lojas), k = contas(t);
+
+  $('#titulo').textContent = t.custo ? `${brl(t.custo)} investidos. ${int(k.vendasG)} ${k.vendasG === 1 ? 'venda' : 'vendas'} do Google.` : 'Sem investimento no período.';
+  $('#resumo').textContent = t.custo ? `${brl(t.receita_google)} em vendas do Google: cada R$ 1 investido virou ${k.roas != null ? brl(k.roas, 2) : '—'} em vendas.` : '';
+  const semSync = lojas.filter(l => !l.sincronizado_em);
+  $('#avisos').innerHTML = (semSync.length ? `<div class="card aviso"><b>Ainda sem dados do Google Ads:</b> ${semSync.map(l => esc(l.nome)).join(', ')}. Os números dessa loja aparecem depois que o script do Google Ads rodar na conta dela.</div>` : '')
+    + (t.ligacoes_a_marcar ? `<div class="card aviso"><b>${int(t.ligacoes_a_marcar)} ${t.ligacoes_a_marcar === 1 ? 'ligação atendida' : 'ligações atendidas'} sem resultado.</b> Marque em <a href="ligacoes.html">Ligações</a> se virou venda: sem isso o custo por venda e o retorno ficam piores do que são.</div>` : '');
+
+  const card = ([v, r2, c, cls]) => `<div class="card stat ${cls || ''}"><div class="v num">${v}</div><div class="r">${r2}</div><div class="c">${c}</div></div>`;
+  $('#retorno').innerHTML = [
+    [int(k.leadsG), 'Leads do Google', `${int(t.leads_whats_google)} WhatsApp + ${int(t.ligacoes_atendidas)} ligações`],
+    [din(k.cpl), 'Custo por lead', 'investimento ÷ leads'],
+    [int(k.vendasG), 'Vendas do Google', `${int(t.vendas_whats_google)} WhatsApp + ${int(t.vendas_ligacao)} ligações`],
+    [din(k.cpv), 'Custo por venda', 'investimento ÷ vendas'],
+    [brlCurto(t.receita_google), 'Receita do Google', 'vendas de quem veio do anúncio'],
+    [vezes(k.roas), 'Retorno', k.roi != null ? `ROI ${pct1(k.roi)} sobre o investido` : '—', k.roas == null ? '' : k.roas >= 1 ? 'bom' : 'ruim'],
+    [pct1(k.conv), 'Conversão geral', 'vendas ÷ leads (todas as origens)'],
+    [din(k.ticket, 0), 'Ticket médio', 'todas as vendas']
+  ].map(card).join('');
+  $('#midia').innerHTML = [
+    [brlCurto(t.custo), 'Investimento', 'custo no Google Ads'],
+    [int(t.impressoes), 'Impressões', int(t.cliques) + ' cliques'],
+    [pct1(k.ctr), 'CTR', 'cliques ÷ impressões'],
+    [din(k.cpc), 'CPC médio', 'custo por clique'],
+    [int(t.ligacoes), 'Ligações', `${int(t.ligacoes_atendidas)} atendidas`],
+    [pct1(k.atend), 'Ligações atendidas', `${int(t.ligacoes - t.ligacoes_atendidas)} perdidas`],
+    [int(Math.round(t.conv_google)), 'Conversões no Google', 'o que o próprio Google contou'],
+    [lojas.some(l => l.sincronizado_em) ? dataHora(lojas.map(l => l.sincronizado_em).filter(Boolean).sort().pop()) : '—', 'Última atualização', 'dados do Google Ads']
+  ].map(card).join('');
+
+  const dias = r.por_dia || [], maxd = Math.max(1, ...dias.map(d => Number(d.custo)));
+  $('#dias').innerHTML = dias.length ? dias.map(d => `<div class="coluna" data-d="${d.dia}" data-c="${d.custo}" data-k="${d.cliques}"><div class="b" style="height:${Number(d.custo) / maxd * 100}%"></div></div>`).join('') : '<div class="caption" style="padding-bottom:20px">Sem custo no período.</div>';
+  const fmt = s => s ? s.slice(8, 10) + '/' + s.slice(5, 7) : '';
+  $('#eixo').innerHTML = dias.length ? `<span>${fmt(dias[0].dia)}</span><span>Investimento por dia</span><span>${fmt(dias[dias.length - 1].dia)}</span>` : '';
+
+  $('#bloco-lojas').classList.toggle('hidden', !!Painel.loja() || lojas.length < 2);
+  const linhaLoja = (nome, x, b) => { const c = contas(x), w = s => b ? `<b>${s}</b>` : s;
+    return `<tr><td>${w(esc(nome))}</td><td class="d num">${w(brl(x.custo))}</td><td class="d num">${w(int(c.leadsG))}</td><td class="d num">${w(din(c.cpl))}</td><td class="d num">${w(int(c.vendasG))}</td><td class="d num">${w(din(c.cpv))}</td><td class="d num">${w(brl(x.receita_google))}</td><td class="d num">${w(vezes(c.roas))}</td><td class="d num">${w(pct1(c.atend))}</td><td class="d num">${w(pct1(c.conv))}</td><td class="d num">${w(din(c.ticket, 0))}</td></tr>`; };
+  $('#lojas-tab').innerHTML = '<tr><th>Loja</th><th class="d">Investimento</th><th class="d">Leads Google</th><th class="d">CPL</th><th class="d">Vendas Google</th><th class="d">Custo/venda</th><th class="d">Receita Google</th><th class="d">Retorno</th><th class="d">Lig. atendidas</th><th class="d">Conversão</th><th class="d">Ticket médio</th></tr>'
+    + lojas.map(l => linhaLoja(l.nome, l)).join('') + (lojas.length > 1 ? linhaLoja('Total', t, true) : '');
+
+  const cs = r.campanhas || [], varias = !Painel.loja() && lojas.length > 1;
+  carregarPalavras(de, ate, varias);
+  $('#camp-tab').innerHTML = cs.length ? '<tr><th>Campanha</th><th>Status</th><th class="d">Impressões</th><th class="d">Cliques</th><th class="d">CTR</th><th class="d">CPC</th><th class="d">Investimento</th><th class="d">Ligações</th><th class="d">Conv. Google</th></tr>'
+    + cs.map(c => `<tr><td class="nome">${esc(c.nome)}<span class="s">${esc(TIPO[c.tipo] || c.tipo || '')}${c.orcamento_dia ? ' · ' + brl(c.orcamento_dia) + '/dia' : ''}${varias ? ' · ' + esc(c.loja_nome) : ''}</span></td>
+      <td><span class="pill p-${esc(c.status || 'PAUSED')}">${STATUS_C[c.status] || esc(c.status || '—')}</span></td>
+      <td class="d num">${int(c.impressoes)}</td><td class="d num">${int(c.cliques)}</td><td class="d num">${pct1(div(c.cliques, c.impressoes))}</td>
+      <td class="d num">${din(div(c.custo, c.cliques))}</td><td class="d num">${brl(c.custo, 2)}</td>
+      <td class="d num">${int(c.ligacoes)}${c.ligacoes ? ` <span class="caption">(${int(c.ligacoes_atendidas)} atend.)</span>` : ''}</td><td class="d num">${Number(c.conv_google).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</td></tr>`).join('')
+    : '<tr><td class="caption" style="padding:24px 20px">Nenhuma campanha com impressão no período.</td></tr>';
+}
+// ===================================================== palavras-chave, grupos e termos
+const CORR = { EXACT: 'exata', PHRASE: 'frase', BROAD: 'ampla' };
+async function carregarPalavras(de, ate, varias) {
+  const { data: r, error } = await sb.rpc('painel_palavras', { p_de: de.toISOString(), p_ate: ate.toISOString(), p_loja: Painel.loja() });
+  if (error) { $('#pal-tab').innerHTML = `<tr><td class="vazio">Não consegui carregar: ${esc(error.message)}</td></tr>`; return; }
+  const pal = r.palavras || [], gru = r.grupos || [];
+  const avisos = [];
+  if (!r.tem_google) avisos.push('<b>Falta o script novo do Google Ads.</b> Sem ele, custo e cliques por palavra-chave e as vendas que o Google atribuiu não aparecem. Por enquanto a tabela mostra só o que veio do CRM.');
+  (r.sem_rastreio || []).forEach(x => { if (x.sem_palavra / x.leads >= 0.3) avisos.push(`<b>${esc(x.nome)}: ${int(x.sem_palavra)} de ${int(x.leads)} leads do Google chegaram sem a palavra-chave no link.</b> Falta o sufixo de rastreamento na conta dessa loja.`); });
+  $('#pal-avisos').innerHTML = avisos.map(a => `<div class="card aviso">${a}</div>`).join('');
+
+  const totV = pal.reduce((s, x) => s + Number(x.vendas || 0), 0);
+  const top = pal.filter(x => Number(x.vendas) > 0).sort((a, b) => b.receita - a.receita)[0];
+  $('#h-pal').textContent = top ? `"${top.palavra}" lidera: ${int(top.vendas)} ${Number(top.vendas) === 1 ? 'venda' : 'vendas'}, ${brlCurto(top.receita)}.` : (pal.length ? 'Nenhuma venda atribuída a palavra-chave no período.' : 'O que vende.');
+  const cls = (x) => Number(x.vendas) > 0 ? (x.custo > 0 && x.receita / x.custo >= 1 ? 'v-bom' : '') : (x.custo >= 100 ? 'v-ruim' : '');
+  // onde a palavra está: grupo + campanhas, com os cliques de cada uma (a mesma palavra pode estar em várias campanhas)
+  const onde = (x) => {
+    const o = (x.onde || []).filter(i => Number(i.cliques) > 0 || i.ativa);
+    if (!o.length) return { txt: x.grupos ? esc([...new Set(String(x.grupos).split(' · '))].join(' · ')) : (x.no_google ? '' : 'só no CRM'), tit: '' };
+    const tit = o.map(i => `${i.campanha} › ${i.grupo}: ${int(i.cliques)} cliques, ${brl(i.custo, 2)}${i.ativa ? '' : ' (pausada)'}`).join('\n');
+    if (o.length === 1) return { txt: `${esc(o[0].grupo)} · ${esc(o[0].campanha)}${o[0].ativa ? '' : ' (pausada)'}`, tit };
+    const grupos = [...new Set(o.map(i => i.grupo))], umGrupo = grupos.length === 1;
+    const ativas = o.filter(i => i.ativa).length;
+    const comClique = o.filter(i => Number(i.cliques) > 0), mostra = comClique.slice(0, 3), resto = o.length - mostra.length;
+    const item = (i) => `${esc(i.campanha)}${umGrupo ? '' : ' › ' + esc(i.grupo)} (<b>${int(i.cliques)}</b>${i.ativa ? '' : ', pausada'})`;
+    return { txt: (umGrupo ? esc(grupos[0]) + ' · ' : '') + `<span class="dup" title="A mesma palavra em mais de uma campanha ativa: elas disputam o mesmo clique entre si">em ${ativas} ${ativas === 1 ? 'campanha ativa' : 'campanhas ativas'}</span>`
+      + (mostra.length ? ' · cliques: ' + mostra.map(item).join(', ') : '') + (resto > 0 ? `, +${resto} ${resto === 1 ? 'outra' : 'outras'}` : ''), tit };
+  };
+  const linhaP = (x) => { const w = onde(x); return `<tr><td class="nome">${esc(x.palavra)}${x.correspondencia ? `<span class="tag-m">${esc(String(x.correspondencia).split(',').map(m => CORR[m] || m.toLowerCase()).join(' / '))}</span>` : ''}<span class="s" title="${esc(w.tit)}">${w.txt}${varias ? ' · ' + esc(x.loja) : ''}</span></td>
+    <td class="d num">${int(x.cliques)}</td><td class="d num">${brl(x.custo, 2)}</td><td class="d num">${int(x.leads_whats)}</td>
+    <td class="d num ${cls(x)}">${int(x.vendas)}</td><td class="d num">${x.receita ? brl(x.receita) : '—'}</td>
+    <td class="d num">${din(Number(x.vendas) ? x.custo / x.vendas : null)}</td><td class="d num ${cls(x)}">${x.custo ? vezes(x.receita / x.custo) : '—'}</td></tr>`; };
+  $('#pal-tab').innerHTML = pal.length ? '<tr><th>Palavra-chave</th><th class="d">Cliques</th><th class="d">Custo</th><th class="d">Leads WhatsApp</th><th class="d">Vendas</th><th class="d">Receita</th><th class="d">Custo/venda</th><th class="d">Retorno</th></tr>' + pal.map(linhaP).join('')
+    : '<tr><td class="vazio">Sem palavras-chave com custo ou lead no período.</td></tr>';
+
+  const topG = gru.filter(x => Number(x.vendas) > 0).sort((a, b) => b.receita - a.receita)[0];
+  $('#h-gru').textContent = topG ? `${topG.grupo}: ${int(topG.vendas)} ${Number(topG.vendas) === 1 ? 'venda' : 'vendas'}, ${brlCurto(topG.receita)}.` : 'Grupo por grupo.';
+  $('#gru-tab').innerHTML = gru.length ? '<tr><th>Grupo de anúncio</th><th class="d">Cliques</th><th class="d">Custo</th><th class="d">Leads WhatsApp</th><th class="d">Vendas</th><th class="d">Receita</th><th class="d">Custo/venda</th><th class="d">Retorno</th></tr>'
+    + gru.map(x => `<tr><td class="nome">${esc(x.grupo)}<span class="s">${esc(x.campanha || '')}${varias ? ' · ' + esc(x.loja) : ''}</span></td>
+      <td class="d num">${int(x.cliques)}</td><td class="d num">${brl(x.custo, 2)}</td><td class="d num">${int(x.leads_whats)}</td>
+      <td class="d num ${cls(x)}">${int(x.vendas)}</td><td class="d num">${x.receita ? brl(x.receita) : '—'}</td>
+      <td class="d num">${din(Number(x.vendas) ? x.custo / x.vendas : null)}</td><td class="d num ${cls(x)}">${x.custo ? vezes(x.receita / x.custo) : '—'}</td></tr>`).join('')
+    : '<tr><td class="vazio">Os grupos aparecem depois que o script novo do Google Ads rodar.</td></tr>';
+
+  const tp = r.termos_periodo || {}, fmt = s => s ? String(s).slice(8, 10) + '/' + String(s).slice(5, 7) : '';
+  $('#l-ter').textContent = 'Termos reais de pesquisa' + (tp.de ? ` de ${fmt(tp.de)} a ${fmt(tp.ate)}` : ' dos últimos 30 dias') + ' (o Google só libera esse dado em janela fixa, não muda com o filtro de período). Os que gastam e não vendem são candidatos a palavra negativa.';
+  const tv = r.termos_vendem || [], tg = r.termos_gastam || [];
+  $('#h-ter').textContent = tg.length ? `${brl(tg.reduce((s, x) => s + Number(x.custo), 0))} em termos que não venderam.` : 'O que as pessoas digitaram.';
+  $('#ter-ok').innerHTML = tv.length ? '<tr><th>Termo</th><th class="d">Custo</th><th class="d">Vendas</th><th class="d">Receita</th></tr>'
+    + tv.map(x => `<tr><td class="nome">${esc(x.termo)}<span class="s">${esc(x.grupo || '')}</span></td><td class="d num">${brl(x.custo, 2)}</td><td class="d num v-bom">${Number(x.vendas_google).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</td><td class="d num">${brl(x.receita_google)}</td></tr>`).join('')
+    : '<tr><td class="vazio">Nenhum termo com venda atribuída ainda.</td></tr>';
+  $('#ter-ruim').innerHTML = tg.length ? '<tr><th>Termo</th><th class="d">Cliques</th><th class="d">Custo</th><th class="d">Conv. Google</th></tr>'
+    + tg.map(x => `<tr><td class="nome">${esc(x.termo)}<span class="s">${esc(x.grupo || '')}</span></td><td class="d num">${int(x.cliques)}</td><td class="d num v-ruim">${brl(x.custo, 2)}</td><td class="d num">${Number(x.conv_google).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</td></tr>`).join('')
+    : '<tr><td class="vazio">Os termos aparecem depois que o script novo do Google Ads rodar.</td></tr>';
+}
+document.addEventListener('mousemove', e => {
+  const c = e.target.closest && e.target.closest('.coluna'), d = $('#dica');
+  if (!c) { d.classList.add('hidden'); return; }
+  d.innerHTML = `<b>${c.dataset.d.split('-').reverse().join('/')}</b><br>${brl(c.dataset.c, 2)} · ${int(c.dataset.k)} cliques`;
+  d.style.left = Math.min(e.clientX + 14, innerWidth - d.offsetWidth - 10) + 'px'; d.style.top = (e.clientY + 14) + 'px'; d.classList.remove('hidden');
+});
+Painel.iniciar('campanhas', (cliente, quem) => {
+  sb = cliente; eu = quem || {};
+  Painel.quandoTrocarLoja(() => carregar());
+  $('#periodos').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { chave = b.dataset.p; guarda.gravar('periodo-camp', chave); carregar(); } });
+  carregar();
+});
+</script>
+</body>
+</html>
