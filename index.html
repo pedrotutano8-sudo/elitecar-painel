@@ -13,6 +13,7 @@
 <style>
 .topo{padding:48px 0 8px}
 .topo .linha{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.fora-per{display:inline-block;margin-top:4px;font-size:11px;padding:1px 8px;border-radius:980px;background:rgba(255,159,10,.14);color:#b25e00}
 .periodo{display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:100%;min-width:0}
 .topo .linha>*{min-width:0;max-width:100%}
 .periodo .datas{display:flex;gap:6px;align-items:center}
@@ -34,13 +35,6 @@
 .filtro.on{background:var(--text);border-color:var(--text);color:var(--bg);font-weight:600}
 .filtro.on b{color:var(--bg);opacity:.6}
 .busca{flex:1;min-width:200px}
-.canais{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:-12px 0 22px}
-.canais .rot{font-size:12px;color:var(--text-3);margin-right:2px}
-.canal{height:34px;padding:0 14px;border-radius:980px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);font-size:13px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;transition:all .2s var(--ease)}
-.canal b{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
-.canal i{font-style:normal;font-size:12px;color:var(--text-3)}
-.canal.on{background:var(--accent);border-color:var(--accent);color:#fff}
-.canal.on b,.canal.on i{color:#fff}
 .busca .in{height:36px;border-radius:980px;font-size:14px}
 
 .lista{overflow:hidden}
@@ -88,7 +82,7 @@
         <h1 class="display" id="titulo">Carregando…</h1>
         <div class="periodo">
           <div class="seg" id="periodos">
-            <button data-p="hoje">Hoje</button><button data-p="7d">7 dias</button><button data-p="mes">Este mês</button><button data-p="mesant">Mês passado</button><button data-p="custom">Período</button>
+            <button data-p="hoje">Hoje</button><button data-p="ontem">Ontem</button><button data-p="7d">7 dias</button><button data-p="mes">Este mês</button><button data-p="mesant">Mês passado</button><button data-p="custom">Período</button>
           </div>
           <div class="datas hidden" id="datas"><input type="date" class="in" id="d-de"><span class="caption">até</span><input type="date" class="in" id="d-ate"><button class="btn sm" id="d-ok">Aplicar</button></div>
         </div>
@@ -96,7 +90,6 @@
     </section>
 
     <section class="kpis" id="kpis"></section>
-    <section class="canais" id="canais" aria-label="Leads por origem"></section>
 
     <section class="ferramentas">
       <div class="filtros" id="filtros"></div>
@@ -114,53 +107,40 @@
 <script>
 const { $, esc, brl, int, pct, dataHora, fone, STATUS, CANAL, periodo, MESES, guarda, toast, valorBR } = Painel;
 let eu = {};
-let sb, todos = [], leads = [], filtro = 'todos', canal = guarda.ler('canal-crm', ''), chave = guarda.ler('periodo-crm', 'hoje'), faixa;
+let sb, leads = [], filtro = 'todos', chave = guarda.ler('periodo-crm', 'hoje'), faixa;
 const alvoInicial = new URLSearchParams(location.search).get('lead');
 
 function setPeriodo(p) {
   chave = p; guarda.gravar('periodo-crm', p);
   document.querySelectorAll('#periodos button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
   $('#datas').classList.toggle('hidden', p !== 'custom');
-  if (p === 'custom' && !$('#d-de').value) { const n = new Date(); $('#d-de').value = new Date(n.getFullYear(), n.getMonth(), 1).toISOString().slice(0, 10); $('#d-ate').value = n.toISOString().slice(0, 10); }
+  if (p === 'custom' && !$('#d-de').value) { const n = new Date(), dia = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; $('#d-de').value = dia(new Date(n.getFullYear(), n.getMonth(), 1)); $('#d-ate').value = dia(n); }
   carregar();
 }
 
 async function carregar() {
   faixa = periodo(chave, $('#d-de').value, $('#d-ate').value);
-  const rotulo = { hoje: 'Hoje', '7d': 'Últimos 7 dias', mes: MESES[faixa[0].getMonth()], mesant: MESES[faixa[0].getMonth()], custom: 'Período' }[chave];
+  const rotulo = { hoje: 'Hoje', ontem: 'Ontem', '7d': 'Últimos 7 dias', mes: MESES[faixa[0].getMonth()], mesant: MESES[faixa[0].getMonth()], custom: 'Período' }[chave];
   $('#sobre').textContent = 'Comercial · ' + rotulo + ((eu.lojas || []).length > 1 ? ' · ' + Painel.lojaNome(eu) : '');
   $('#lista').innerHTML = '<div class="vazio">Carregando…</div>';
   const { data, error } = await sb.rpc('painel_leads', { p_de: faixa[0].toISOString(), p_ate: faixa[1].toISOString(), p_loja: Painel.loja() });
   if (error) { $('#lista').innerHTML = `<div class="vazio">Não consegui carregar: ${esc(error.message)}</div>`; return; }
-  todos = data || [];
+  leads = data || [];
   render();
   if (alvoInicial && !carregar._abriu) {
     carregar._abriu = true;
-    if (todos.some(l => l.telefone === alvoInicial)) { canal = ''; $('#busca').value = alvoInicial; render(); conversa(alvoInicial); }
+    if (leads.some(l => l.telefone === alvoInicial)) { $('#busca').value = alvoInicial; render(); conversa(alvoInicial); }
     else toast('Esse lead não está no período selecionado.');
   }
 }
 
-// origem do lead: chips com leads e vendas de cada canal no período; clicar filtra números e lista
-function renderCanais() {
-  const [de0, ate0] = faixa, per = todos.filter(l => new Date(l.chegou_em) >= de0 && new Date(l.chegou_em) < ate0);
-  const por = {}; per.forEach(l => { const k = l.canal || 'organico'; (por[k] = por[k] || { n: 0, v: 0 }).n++; if (l.status === 'vendido') por[k].v++; });
-  if (canal && !por[canal]) por[canal] = { n: 0, v: 0 };
-  const ordem = Object.keys(por).sort((a, b) => por[b].n - por[a].n);
-  const vendas = per.filter(l => l.status === 'vendido').length;
-  const chip = (k, rot, n, v) => `<button class="canal ${canal === k ? 'on' : ''}" data-c="${esc(k)}">${esc(rot)} <b>${int(n)}</b><i>${k && n ? pct(n, per.length, 0) + ' · ' : ''}${int(v)} ${v === 1 ? 'venda' : 'vendas'}</i></button>`;
-  $('#canais').innerHTML = `<span class="rot">Origem</span>` + chip('', 'Todas', per.length, vendas) + ordem.map(k => chip(k, CANAL[k] || k, por[k].n, por[k].v)).join('');
-}
-
 function render() {
-  renderCanais();
-  leads = canal ? todos.filter(l => (l.canal || 'organico') === canal) : todos;
   const [de0, ate0] = faixa, doPeriodo = leads.filter(l => new Date(l.chegou_em) >= de0 && new Date(l.chegou_em) < ate0);
   const total = doPeriodo.length, ganhos = doPeriodo.filter(l => l.status === 'vendido');
   const receita = ganhos.reduce((s, l) => s + Number(l.venda_valor || 0), 0);
   const google = doPeriodo.filter(l => l.canal === 'google');
   const abertos = doPeriodo.filter(l => l.status === 'atendimento' || l.status === 'triagem').length;
-  $('#titulo').textContent = total ? `${int(total)} leads${canal ? ' do ' + (CANAL[canal] || canal) : ''}. ${int(ganhos.length)} ${ganhos.length === 1 ? 'venda' : 'vendas'}.` : (canal ? 'Nenhum lead desse canal.' : 'Nenhum lead ainda.');
+  $('#titulo').textContent = total ? `${int(total)} ${total === 1 ? 'lead' : 'leads'}. ${int(ganhos.length)} ${ganhos.length === 1 ? 'venda' : 'vendas'}.` : 'Nenhum lead ainda.';
   $('#kpis').innerHTML = [
     ['Leads', int(total), int(google.length) + ' do Google Ads'],
     ['Em aberto', int(abertos), 'sem venda marcada'],
@@ -170,13 +150,16 @@ function render() {
     ['Vendas do Google', int(ganhos.filter(l => l.canal === 'google').length), brl(ganhos.filter(l => l.canal === 'google').reduce((s, l) => s + Number(l.venda_valor || 0), 0))]
   ].map(([l, v, s, c]) => `<div class="card kpi ${c || ''}"><div class="caption">${l}</div><div class="v num">${v}</div><div class="s">${s}</div></div>`).join('');
 
-  const cont = { todos: total, sugestao: leads.filter(l => l.sugestao).length, esperando: leads.filter(l => l.ia_situacao === 'aguardando_loja' && !l.sugestao).length }; leads.forEach(l => cont[l.status] = (cont[l.status] || 0) + 1);
+  // lista e contadores = só quem chegou no período. Exceção: "A IA sugeriu" mostra também sugestões pendentes de dias anteriores
+  // (precisam de resposta da equipe) e a busca procura em tudo que foi carregado.
+  const cont = { todos: total, sugestao: leads.filter(l => l.sugestao).length, esperando: doPeriodo.filter(l => l.ia_situacao === 'aguardando_loja' && !l.sugestao).length }; doPeriodo.forEach(l => cont[l.status] = (cont[l.status] || 0) + 1);
   $('#filtros').innerHTML = (cont.sugestao ? ['sugestao'] : []).concat(cont.esperando ? ['esperando'] : []).concat(['todos', 'triagem', 'atendimento', 'vendido', 'perdido'])
     .map(k => `<button class="filtro ${filtro === k ? 'on' : ''}" data-f="${k}">${k === 'todos' ? 'Todos' : k === 'sugestao' ? 'A IA sugeriu' : k === 'esperando' ? 'Cliente esperando' : STATUS[k]}<b>${cont[k] || 0}</b></button>`).join('');
   if (filtro === 'sugestao' && !cont.sugestao) filtro = 'todos';
 
   const q = $('#busca').value.trim().toLowerCase();
-  const vis = leads.filter(l => (filtro === 'todos' || l.status === filtro || (filtro === 'sugestao' && l.sugestao) || (filtro === 'esperando' && l.ia_situacao === 'aguardando_loja' && !l.sugestao)) &&
+  const noPeriodo = new Set(doPeriodo), base = (q || filtro === 'sugestao') ? leads : doPeriodo;
+  const vis = base.filter(l => (filtro === 'todos' || l.status === filtro || (filtro === 'sugestao' && l.sugestao) || (filtro === 'esperando' && l.ia_situacao === 'aguardando_loja' && !l.sugestao)) &&
     (!q || [l.nome, l.telefone, l.carro, l.bairro, fone(l.telefone)].some(x => String(x || '').toLowerCase().includes(q))));
   if (!vis.length) { $('#lista').innerHTML = `<div class="vazio">${total ? 'Nenhum lead com esse filtro.' : 'Nenhum lead nesse período.'}</div>`; return; }
 
@@ -189,7 +172,7 @@ function render() {
       ? `<button class="btn sm" data-a="reabrir" data-t="${esc(l.telefone)}">Reabrir</button>`
       : `<button class="btn sm ganho" data-a="ganho" data-t="${esc(l.telefone)}">Vendido</button><button class="btn sm perdido" data-a="perdido" data-t="${esc(l.telefone)}">Perdido</button>`;
     return `<div class="linha-l ${l.telefone === alvoInicial ? 'realce' : ''}">
-      <div class="quem"><div class="n">${esc(l.nome || 'Sem nome')}</div><div class="t num">${esc(fone(l.telefone))} · ${dataHora(l.chegou_em)}</div></div>
+      <div class="quem"><div class="n">${esc(l.nome || 'Sem nome')}</div><div class="t num">${esc(fone(l.telefone))} · ${dataHora(l.chegou_em)}</div>${noPeriodo.has(l) ? '' : '<span class="fora-per">chegou antes do período</span>'}</div>
       <div class="oque"><div class="c">${esc(l.carro || 'Carro não informado')}</div><div class="t">${esc(l.bairro || 'Bairro não informado')}</div></div>
       <div class="nota"><div class="c">${esc(CANAL[l.canal] || l.canal)}</div><div class="s">${l.tem_gclid ? 'clique rastreado' : ''}</div>${!Painel.loja() && (eu.lojas || []).length > 1 ? `<span class="loja-tag">${esc(l.loja_nome || l.loja)}</span>` : ''}</div>
       <div class="st"><span class="pill p-${l.status}">${STATUS[l.status]}</span></div>
@@ -221,7 +204,7 @@ function situacaoHTML(l) {
 /* ---------- ações ---------- */
 const modal = (html) => { $('#raiz-modal').innerHTML = `<div class="veu" id="veu">${html}</div>`; $('#veu').addEventListener('click', e => { if (e.target.id === 'veu') fechar(); }); };
 const fechar = () => { $('#raiz-modal').innerHTML = ''; };
-const lead = (t) => todos.find(x => x.telefone === t) || {};
+const lead = (t) => leads.find(x => x.telefone === t) || {};
 
 function ganho(t, sug) {
   const l = lead(t), hoje = new Date().toISOString().slice(0, 10);
@@ -297,7 +280,6 @@ Painel.iniciar('crm', (cliente, quem) => {
   $('#periodos').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setPeriodo(b.dataset.p); });
   $('#d-ok').onclick = carregar;
   $('#filtros').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) { filtro = b.dataset.f; render(); } });
-  $('#canais').addEventListener('click', e => { const b = e.target.closest('[data-c]'); if (b) { canal = b.dataset.c; guarda.gravar('canal-crm', canal); render(); } });
   $('#busca').addEventListener('input', render);
   $('#b-atual').onclick = carregar; $('#b-csv').onclick = csv;
   $('#lista').addEventListener('click', e => {

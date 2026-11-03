@@ -39,6 +39,7 @@
     const amanha = z(new Date(n)); amanha.setDate(amanha.getDate() + 1);
     switch (chave) {
       case 'hoje': return [z(new Date(n)), amanha];
+      case 'ontem': { const d = z(new Date(n)); d.setDate(d.getDate() - 1); return [d, z(new Date(n))]; }
       case '7d': { const d = z(new Date(n)); d.setDate(d.getDate() - 6); return [d, amanha]; }
       case '30d': { const d = z(new Date(n)); d.setDate(d.getDate() - 29); return [d, amanha]; }
       case 'mes': return [new Date(n.getFullYear(), n.getMonth(), 1), amanha];
