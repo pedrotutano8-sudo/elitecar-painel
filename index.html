@@ -38,7 +38,7 @@
 .busca .in{height:36px;border-radius:980px;font-size:14px}
 
 .lista{overflow:hidden}
-.linha-l{display:grid;grid-template-columns:minmax(170px,1.3fr) minmax(140px,1.1fr) 110px 130px 100px 330px;gap:14px;align-items:center;padding:16px 20px;border-top:1px solid var(--border);transition:background .15s}
+.linha-l{display:grid;grid-template-columns:minmax(150px,1.3fr) minmax(120px,1.1fr) 100px 124px 92px 436px;gap:14px;align-items:center;padding:16px 20px;border-top:1px solid var(--border);transition:background .15s}
 .linha-l:first-child{border-top:0}
 .linha-l:not(.cab):hover{background:var(--neutral-soft)}
 .linha-l.cab{padding-top:11px;padding-bottom:11px;font-size:12px;color:var(--text-3);letter-spacing:0}
@@ -52,7 +52,7 @@
 .acoes{display:flex;gap:4px;justify-content:flex-end;flex-wrap:nowrap}
 .acoes .btn.quiet{padding:0 9px}
 .vazio{padding:56px 20px;text-align:center;color:var(--text-2)}
-@media (max-width:900px){
+@media (max-width:1100px){
   .linha-l.cab{display:none}
   .linha-l{grid-template-columns:1fr auto;grid-template-areas:"quem st" "oque oque" "nota valor" "acoes acoes";row-gap:10px;padding:16px}
   .quem{grid-area:quem}.st{grid-area:st;justify-self:end}.oque{grid-area:oque}.nota{grid-area:nota}.valor{grid-area:valor;justify-self:end;text-align:right}.acoes{grid-area:acoes;justify-content:flex-start;flex-wrap:wrap}
@@ -99,7 +99,7 @@
     </section>
 
     <section class="card lista" id="lista"></section>
-    <p class="rodape">A IA lê as conversas paradas a cada 15 minutos (áudios inclusive, transcritos) e mostra <b>Possível venda</b> ou <b>Possível perda</b> pra você confirmar. Cliente que some depois da resposta da loja recebe follow-up 1 hora depois e outro no dia seguinte. Marque <b>Vendido</b> com o valor assim que a venda fechar. Venda de lead que veio do Google Ads volta pro Google sozinha no dia seguinte, e é isso que ensina o Google a trazer mais cliente que compra.</p>
+    <p class="rodape">A IA lê as conversas paradas a cada 15 minutos (áudios inclusive, transcritos) e mostra <b>Possível venda</b> ou <b>Possível perda</b> pra você confirmar. Cliente que some depois da resposta da loja recebe follow-up 1 hora depois e outro no dia seguinte. Marque <b>Vendido</b> com o valor assim que a venda fechar. Quem não era cliente de verdade (engano, outro produto, fora da área) é <b>Desqualificado</b>, não perdido. Possível perda que ninguém confirma em 2 dias é marcada sozinha. Venda de lead que veio do Google Ads volta pro Google sozinha no dia seguinte, e é isso que ensina o Google a trazer mais cliente que compra.</p>
   </div>
 </main>
 <div id="raiz-modal"></div>
@@ -139,12 +139,13 @@ function render() {
   const total = doPeriodo.length, ganhos = doPeriodo.filter(l => l.status === 'vendido');
   const receita = ganhos.reduce((s, l) => s + Number(l.venda_valor || 0), 0);
   const google = doPeriodo.filter(l => l.canal === 'google');
+  const desq = doPeriodo.filter(l => l.status === 'desqualificado').length, qualif = total - desq;
   const abertos = doPeriodo.filter(l => l.status === 'atendimento' || l.status === 'triagem').length;
   $('#titulo').textContent = total ? `${int(total)} ${total === 1 ? 'lead' : 'leads'}. ${int(ganhos.length)} ${ganhos.length === 1 ? 'venda' : 'vendas'}.` : 'Nenhum lead ainda.';
   $('#kpis').innerHTML = [
-    ['Leads', int(total), int(google.length) + ' do Google Ads'],
+    ['Leads', int(total), int(google.length) + ' do Google Ads' + (desq ? ` · ${int(desq)} desqualificado${desq === 1 ? '' : 's'} (${pct(desq, total)})` : '')],
     ['Em aberto', int(abertos), 'sem venda marcada'],
-    ['Vendas', int(ganhos.length), pct(ganhos.length, total, 1) + ' de conversão'],
+    ['Vendas', int(ganhos.length), pct(ganhos.length, qualif, 1) + ' dos qualificados'],
     ['Receita', brl(receita), 'no período', 'destaque'],
     ['Ticket médio', ganhos.length ? brl(receita / ganhos.length) : '—', int(ganhos.length) + ' venda(s)'],
     ['Vendas do Google', int(ganhos.filter(l => l.canal === 'google').length), brl(ganhos.filter(l => l.canal === 'google').reduce((s, l) => s + Number(l.venda_valor || 0), 0))]
@@ -153,7 +154,7 @@ function render() {
   // lista e contadores = só quem chegou no período. Exceção: "A IA sugeriu" mostra também sugestões pendentes de dias anteriores
   // (precisam de resposta da equipe) e a busca procura em tudo que foi carregado.
   const cont = { todos: total, sugestao: leads.filter(l => l.sugestao).length, esperando: doPeriodo.filter(l => l.ia_situacao === 'aguardando_loja' && !l.sugestao).length }; doPeriodo.forEach(l => cont[l.status] = (cont[l.status] || 0) + 1);
-  $('#filtros').innerHTML = (cont.sugestao ? ['sugestao'] : []).concat(cont.esperando ? ['esperando'] : []).concat(['todos', 'triagem', 'atendimento', 'vendido', 'perdido'])
+  $('#filtros').innerHTML = (cont.sugestao ? ['sugestao'] : []).concat(cont.esperando ? ['esperando'] : []).concat(['todos', 'triagem', 'atendimento', 'vendido', 'perdido', 'desqualificado'])
     .map(k => `<button class="filtro ${filtro === k ? 'on' : ''}" data-f="${k}">${k === 'todos' ? 'Todos' : k === 'sugestao' ? 'A IA sugeriu' : k === 'esperando' ? 'Cliente esperando' : STATUS[k]}<b>${cont[k] || 0}</b></button>`).join('');
   if (filtro === 'sugestao' && !cont.sugestao) filtro = 'todos';
 
@@ -167,10 +168,10 @@ function render() {
     const valor = l.status === 'vendido'
       ? `<div class="v num">${brl(l.venda_valor, 2)}</div><div class="s">${l.tem_gclid ? 'vai pro Google' : 'sem clique do Google'}</div>`
       : '<span class="s">—</span>';
-    const fechado = l.status === 'vendido' || l.status === 'perdido';
+    const fechado = l.status === 'vendido' || l.status === 'perdido' || l.status === 'desqualificado';
     const acoes = fechado
       ? `<button class="btn sm" data-a="reabrir" data-t="${esc(l.telefone)}">Reabrir</button>`
-      : `<button class="btn sm ganho" data-a="ganho" data-t="${esc(l.telefone)}">Vendido</button><button class="btn sm perdido" data-a="perdido" data-t="${esc(l.telefone)}">Perdido</button>`;
+      : `<button class="btn sm ganho" data-a="ganho" data-t="${esc(l.telefone)}">Vendido</button><button class="btn sm perdido" data-a="perdido" data-t="${esc(l.telefone)}">Perdido</button><button class="btn sm desq" data-a="desqualificado" data-t="${esc(l.telefone)}" title="Não era cliente de verdade: engano, outro produto, fora da área...">Desqualificado</button>`;
     return `<div class="linha-l ${l.telefone === alvoInicial ? 'realce' : ''}">
       <div class="quem"><div class="n">${esc(l.nome || 'Sem nome')}</div><div class="t num">${esc(fone(l.telefone))} · ${dataHora(l.chegou_em)}</div>${noPeriodo.has(l) ? '' : '<span class="fora-per">chegou antes do período</span>'}</div>
       <div class="oque"><div class="c">${esc(l.carro || 'Carro não informado')}</div><div class="t">${esc(l.bairro || 'Bairro não informado')}</div></div>
@@ -186,9 +187,9 @@ function render() {
 function sugestaoHTML(l) {
   const s = l.sugestao || {};
   const conf = { alta: 'alta', media: 'média', baixa: 'baixa' }[s.confianca] || s.confianca || '';
-  if (s.tipo === 'perdido') return `<div class="sug perda"><span class="pill p-ia">IA</span><div class="t"><b>Possível perda</b>${s.motivo ? ' · ' + esc(s.motivo) : ''}
+  if (s.tipo === 'perdido') return `<div class="sug perda${RX_DESQ.test(s.motivo || '') ? ' desq' : ''}"><span class="pill p-ia">IA</span><div class="t"><b>${RX_DESQ.test(s.motivo || '') ? 'Possível desqualificado' : 'Possível perda'}</b>${s.motivo ? ' · ' + esc(s.motivo) : ''}
     <span class="caption"> · certeza ${esc(conf)}</span>${s.evidencia ? `<br><q>${esc(s.evidencia)}</q>` : ''}</div>
-    <div class="ac"><button class="btn sm perdido" data-a="confirmarPerdaIA" data-t="${esc(l.telefone)}">Confirmar perdido</button><button class="btn sm quiet" data-a="descartarIA" data-t="${esc(l.telefone)}">Não foi perdido</button></div></div>`;
+    <div class="ac"><button class="btn sm perdido" data-a="confirmarPerdaIA" data-t="${esc(l.telefone)}">${RX_DESQ.test(s.motivo || '') ? 'Confirmar desqualificado' : 'Confirmar perdido'}</button><button class="btn sm quiet" data-a="descartarIA" data-t="${esc(l.telefone)}">Não foi perdido</button></div></div>`;
   return `<div class="sug"><span class="pill p-ia">IA</span><div class="t"><b>Possível venda${s.valor ? ' de ' + brl(s.valor, 2) : ''}</b>${s.produto ? ' · ' + esc(s.produto) : ''}
     <span class="caption"> · certeza ${esc(conf)}</span>${s.evidencia ? `<br><q>${esc(s.evidencia)}</q>` : ''}</div>
     <div class="ac"><button class="btn sm ganho" data-a="confirmarIA" data-t="${esc(l.telefone)}">Confirmar venda</button><button class="btn sm quiet" data-a="descartarIA" data-t="${esc(l.telefone)}">Não foi venda</button></div></div>`;
@@ -226,16 +227,31 @@ function perdido(t, motivoIA) {
   const l = lead(t);
   modal(`<div class="modal"><h3>Marcar como perdido</h3><div class="sub">${esc(l.nome || fone(t))}</div>
     <label class="l" for="m-mot">Motivo</label>
-    <select id="m-mot" class="in"><option value="">Sem motivo</option><option>Achou caro</option><option>Fechou com concorrente</option><option>Desistiu ou parou de responder</option><option>Fora da área de entrega</option><option>Não tinha a bateria</option><option>Só pesquisando preço</option><option>Não era cliente</option><option>Outro</option></select>
+    <select id="m-mot" class="in"><option value="">Sem motivo</option><option>Achou caro</option><option>Fechou com concorrente</option><option>Desistiu ou parou de responder</option><option>Não tinha a bateria</option><option>Só pesquisando preço</option><option>Outro</option></select>
+    <div class="caption" style="margin-top:10px">Não era cliente de verdade (engano, outro produto, fora da área)? Use <b>Desqualificado</b>.</div>
     <div class="erro" id="m-erro"></div>
     <div class="pe"><button class="btn quiet" id="m-x">Cancelar</button><button class="btn primary" id="m-ok">Salvar</button></div></div>`);
   $('#m-x').onclick = fechar;
   if (motivoIA) { const o = [...$('#m-mot').options].find(x => x.text === motivoIA); if (o) $('#m-mot').value = o.value || o.text; }
   $('#m-ok').onclick = () => executar({ p_telefone: t, p_acao: 'perdido', p_motivo: $('#m-mot').value || null }, 'Marcado como perdido');
 }
+const MOTIVOS_DESQ = ['Procurava outro produto ou serviço', 'Fora da área de entrega', 'Engano ou número errado', 'Fornecedor, vendedor ou parceiro', 'Procurando emprego', 'Outro'];
+const RX_DESQ = /n[aã]o era cliente|engano|n[uú]mero errado|fora da [aá]rea|fornecedor|vendedor|emprego|outro produto|n[aã]o trabalha(mos)? com/i;
+function desqualificado(t, motivoIA) {
+  const l = lead(t);
+  modal(`<div class="modal"><h3>Marcar como desqualificado</h3><div class="sub">${esc(l.nome || fone(t))} · não era cliente de verdade</div>
+    <label class="l" for="m-mot">Motivo</label>
+    <select id="m-mot" class="in"><option value="">Sem motivo</option>${MOTIVOS_DESQ.map(m => `<option>${esc(m)}</option>`).join('')}</select>
+    <div class="caption" style="margin-top:10px">Era cliente e só não fechou (preço, concorrente, sumiu)? Use <b>Perdido</b>.</div>
+    <div class="erro" id="m-erro"></div>
+    <div class="pe"><button class="btn quiet" id="m-x">Cancelar</button><button class="btn primary" id="m-ok">Salvar</button></div></div>`);
+  $('#m-x').onclick = fechar;
+  if (motivoIA) { const o = MOTIVOS_DESQ.find(m => m.toLowerCase().slice(0, 12) === String(motivoIA).toLowerCase().slice(0, 12)); if (o) $('#m-mot').value = o; }
+  $('#m-ok').onclick = () => executar({ p_telefone: t, p_acao: 'desqualificado', p_motivo: $('#m-mot').value || null }, 'Marcado como desqualificado');
+}
 const reabrir = (t) => executar({ p_telefone: t, p_acao: 'reabrir' }, 'Lead reaberto');
 const confirmarIA = (t) => ganho(t, lead(t).sugestao || {});
-const confirmarPerdaIA = (t) => perdido(t, (lead(t).sugestao || {}).motivo);
+const confirmarPerdaIA = (t) => { const m = (lead(t).sugestao || {}).motivo; return RX_DESQ.test(m || '') ? desqualificado(t, m) : perdido(t, m); };
 const descartarIA = (t) => executar({ p_telefone: t, p_acao: 'descartar_sugestao' }, 'Sugestão descartada');
 
 async function executar(args, msg) {
@@ -284,7 +300,7 @@ Painel.iniciar('crm', (cliente, quem) => {
   $('#b-atual').onclick = carregar; $('#b-csv').onclick = csv;
   $('#lista').addEventListener('click', e => {
     const b = e.target.closest('[data-a]'); if (!b) return;
-    ({ ganho, perdido, reabrir, conversa, confirmarIA, confirmarPerdaIA, descartarIA })[b.dataset.a](b.dataset.t);
+    ({ ganho, perdido, desqualificado, reabrir, conversa, confirmarIA, confirmarPerdaIA, descartarIA })[b.dataset.a](b.dataset.t);
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') fechar(); });
   setPeriodo(chave);

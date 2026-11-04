@@ -38,7 +38,8 @@ section.bloco{padding:72px 0;border-top:1px solid var(--border)}
 /* colunas por dia */
 .colunas{display:flex;align-items:flex-end;gap:3px;height:180px;padding:24px 24px 0}
 .coluna{flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;cursor:default;position:relative}
-.coluna .b{background:var(--accent);border-radius:4px 4px 0 0;min-height:2px;transition:opacity .15s}
+.coluna .b{background:var(--accent);border-radius:4px 4px 0 0;min-height:2px;transition:opacity .15s;position:relative;overflow:hidden}
+.coluna .b .dq{position:absolute;left:0;right:0;bottom:0;background:var(--warn)}
 .coluna:hover .b{opacity:.75}
 .coluna .venda{position:absolute;left:50%;transform:translateX(-50%);width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 2px var(--surface)}
 .eixo{display:flex;justify-content:space-between;padding:8px 24px 18px;border-top:1px solid var(--border);margin-top:0;font-size:12px;color:var(--text-3);letter-spacing:0}
@@ -95,9 +96,9 @@ section.bloco{padding:72px 0;border-top:1px solid var(--border)}
 
     <section class="bloco">
       <div class="eyebrow">Ritmo</div><h2 class="headline">Leads por dia.</h2>
-      <p class="lede">Cada coluna é um dia. O ponto verde marca dia com venda.</p>
+      <p class="lede">Cada coluna é um dia. A parte laranja são os desqualificados. O ponto verde marca dia com venda.</p>
       <div class="card" style="margin-top:28px"><div class="colunas" id="dias"></div><div class="eixo" id="eixo"></div>
-        <div class="legenda-c"><span><i class="ponto" style="background:var(--accent)"></i>Leads</span><span><i class="ponto" style="background:var(--ok)"></i>Teve venda</span></div></div>
+        <div class="legenda-c"><span><i class="ponto" style="background:var(--accent)"></i>Leads</span><span><i class="ponto" style="background:var(--warn)"></i>Desqualificados</span><span><i class="ponto" style="background:var(--ok)"></i>Teve venda</span></div></div>
     </section>
 
     <section class="bloco">
@@ -116,6 +117,14 @@ section.bloco{padding:72px 0;border-top:1px solid var(--border)}
       <div class="dois">
         <div><div class="eyebrow">Bairros</div><h2 class="headline">Onde estão.</h2><div class="card rolagem" style="margin-top:24px"><table class="tabela" id="bairros"></table></div></div>
         <div><div class="eyebrow">Perdas</div><h2 class="headline">Por que não fechou.</h2><div class="card barras" id="perdas" style="margin-top:24px"></div></div>
+      </div>
+    </section>
+    <section class="bloco">
+      <div class="eyebrow">Desqualificados</div><h2 class="headline" id="dq-tit">Quem não era cliente.</h2>
+      <p class="lede">Engano, outro produto, fora da área. Mede a qualidade do tráfego, não da equipe.</p>
+      <div class="dois" style="margin-top:24px">
+        <div class="card rolagem" style="max-height:440px;overflow-y:auto"><table class="tabela" id="dq-dias"></table></div>
+        <div class="card barras" id="dq-mot"></div>
       </div>
     </section>
     <p class="caption" style="margin:24px 0 64px">Os números saem do mesmo banco do CRM, ao vivo.</p>
@@ -141,8 +150,8 @@ async function carregar() {
   const pl = (n, um, varios) => `${int(n)} ${n === 1 ? um : varios}`;
   $('#resumo').textContent = t.leads ? `${brl(t.receita)} em vendas. ${pl(t.google, 'lead veio', 'leads vieram')} do Google Ads e ${pl(t.ganhos_google, 'virou venda', 'viraram venda')} (${brl(t.receita_google)}).` : '';
   $('#stats').innerHTML = [
-    [int(t.leads), 'Leads', `${int(t.google)} do Google Ads`],
-    [int(t.ganhos), 'Vendas', pct(t.ganhos, t.leads, 1) + ' de conversão'],
+    [int(t.leads), 'Leads', `${int(t.google)} do Google Ads · ${int(t.desqualificados || 0)} desqualificados (${pct(t.desqualificados || 0, t.leads)})`],
+    [int(t.ganhos), 'Vendas', pct(t.ganhos, t.leads - (t.desqualificados || 0), 1) + ' dos qualificados'],
     [brlCurto(t.receita), 'Receita', t.ganhos ? 'ticket ' + brl(t.receita / t.ganhos) : '—'],
     [t.resp_mediana_seg != null ? duracao(t.resp_mediana_seg) : '—', 'Resposta da equipe', 'mediana até a 1ª resposta']
   ].map(([v, r2, c]) => `<div class="card stat"><div class="v num">${v}</div><div class="r">${r2}</div><div class="c">${c}</div></div>`).join('');
@@ -154,7 +163,7 @@ async function carregar() {
     + (pls.length > 1 ? `<tr class="total"><td><b>Total</b></td><td class="d num"><b>${int(t.leads)}</b></td><td class="d num"><b>${int(t.google)}</b></td><td class="d num"><b>${int(t.ganhos)}</b></td><td class="d num"><b>${pct(t.ganhos, t.leads, 1)}</b></td><td class="d num"><b>${t.ganhos ? brl(t.receita / t.ganhos) : '—'}</b></td><td class="d num"><b>${brl(t.receita)}</b></td></tr>` : '');
   // dias
   const dias = r.por_dia || [], maxd = Math.max(1, ...dias.map(d => d.leads));
-  $('#dias').innerHTML = dias.map(d => `<div class="coluna" data-d="${d.dia}" data-l="${d.leads}" data-g="${d.ganhos}" data-r="${d.receita}"><div class="b" style="height:${d.leads / maxd * 100}%"></div>${d.ganhos ? '<i class="venda" style="bottom:calc(' + (d.leads / maxd * 100) + '% + 6px)"></i>' : ''}</div>`).join('') || '<div class="caption">Sem dados.</div>';
+  $('#dias').innerHTML = dias.map(d => `<div class="coluna" data-d="${d.dia}" data-l="${d.leads}" data-g="${d.ganhos}" data-q="${d.desqualificados || 0}" data-r="${d.receita}"><div class="b" style="height:${d.leads / maxd * 100}%">${d.desqualificados ? `<div class="dq" style="height:${d.desqualificados / d.leads * 100}%"></div>` : ''}</div>${d.ganhos ? '<i class="venda" style="bottom:calc(' + (d.leads / maxd * 100) + '% + 6px)"></i>' : ''}</div>`).join('') || '<div class="caption">Sem dados.</div>';
   const fmt = s => s ? s.slice(8, 10) + '/' + s.slice(5, 7) : '';
   $('#eixo').innerHTML = dias.length ? `<span>${fmt(dias[0].dia)}</span><span>${fmt(dias[dias.length - 1].dia)}</span>` : '';
   // origem e atendimento
@@ -169,12 +178,19 @@ async function carregar() {
   $('#bairros').innerHTML = bs.length ? '<tr><th>Bairro</th><th class="d">Leads</th><th class="d">Vendas</th></tr>' + bs.map(b => `<tr><td>${esc(b.bairro)}</td><td class="d num">${int(b.leads)}</td><td class="d num">${int(b.ganhos)}</td></tr>`).join('') : '<tr><td class="caption">Sem bairro informado no período.</td></tr>';
   const ps = r.motivos_perda || [], tp = ps.reduce((s, p) => s + p.n, 0);
   barras('#perdas', ps.map(p => [p.motivo, p.n]), tp);
+  // desqualificados: dia a dia (mais recente primeiro) e motivos
+  const tq = t.desqualificados || 0;
+  $('#dq-tit').textContent = tq ? `${pl(tq, 'lead não era cliente', 'leads não eram cliente')} (${pct(tq, t.leads)}).` : 'Nenhum desqualificado no período.';
+  $('#dq-dias').innerHTML = dias.length ? '<tr><th>Dia</th><th class="d">Leads</th><th class="d">Desqualificados</th><th class="d">%</th></tr>'
+    + dias.slice().reverse().map(d => `<tr><td>${fmt(d.dia)}</td><td class="d num">${int(d.leads)}</td><td class="d num">${int(d.desqualificados || 0)}</td><td class="d num">${pct(d.desqualificados || 0, d.leads)}</td></tr>`).join('') : '<tr><td class="caption">Sem dados.</td></tr>';
+  const mq = r.motivos_desqualificado || [];
+  barras('#dq-mot', mq.map(p => [p.motivo, p.n]), tq);
 }
 // dica ao passar o mouse
 document.addEventListener('mousemove', e => {
   const c = e.target.closest && e.target.closest('.coluna'), d = $('#dica');
   if (!c) { d.classList.add('hidden'); return; }
-  d.innerHTML = c.dataset.d ? `<b>${c.dataset.d.split('-').reverse().join('/')}</b><br>${c.dataset.l} leads · ${c.dataset.g} vendas${Number(c.dataset.r) ? ' · ' + brl(c.dataset.r) : ''}` : `<b>${c.dataset.h}h</b><br>${c.dataset.v} leads`;
+  d.innerHTML = c.dataset.d ? `<b>${c.dataset.d.split('-').reverse().join('/')}</b><br>${c.dataset.l} leads · ${c.dataset.q} desqualificado${c.dataset.q === "1" ? "" : "s"} · ${c.dataset.g} vendas${Number(c.dataset.r) ? ' · ' + brl(c.dataset.r) : ''}` : `<b>${c.dataset.h}h</b><br>${c.dataset.v} leads`;
   d.style.left = Math.min(e.clientX + 14, innerWidth - d.offsetWidth - 10) + 'px'; d.style.top = (e.clientY + 14) + 'px'; d.classList.remove('hidden');
 });
 Painel.iniciar('relatorio', (cliente, quem) => {

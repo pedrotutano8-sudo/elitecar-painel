@@ -30,7 +30,7 @@
     return isFinite(v) && v > 0 ? v : null;
   };
 
-  const STATUS = { triagem: 'Com o bot', atendimento: 'Em atendimento', vendido: 'Vendido', perdido: 'Perdido' };
+  const STATUS = { triagem: 'Com o bot', atendimento: 'Em atendimento', vendido: 'Vendido', perdido: 'Perdido', desqualificado: 'Desqualificado' };
   const CANAL = { google: 'Google Ads', meta: 'Meta', site: 'Site', organico: 'WhatsApp direto' };
 
   // ---------- período ----------
