@@ -190,7 +190,7 @@ function desenhar() {
   $('#cards').innerHTML = [
     card(int(v(aHI)), 'Impressões', v(aHI), v(aBI), x => int(Math.round(x))),
     card(int(v(aHC)), 'Cliques', v(aHC), v(aBC), x => x.toLocaleString('pt-BR', { maximumFractionDigits: 1 })),
-    card(brl(v(aHCu)), 'Investimento', v(aHCu), v(aBCu), x => brl(x)),
+    card(brl(v(aHCu)), 'Investimento', v(aHCu), v(aBCu), x => brl(x), true),   // com teto de verba, gastar mais rápido é ruim
     card(cpcH == null ? '—' : brl(cpcH, 2), 'CPC médio', cpcH || 0, cpcB, x => brl(x, 2), true)
   ].join('');
 
