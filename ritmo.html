@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Ritmo do dia</title>
+<link rel="stylesheet" href="comum.css">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="comum.js"></script>
+<style>
+.hero{padding:72px 0 40px}
+.hero .controle{margin-top:24px}
+section.bloco{padding:56px 0;border-top:1px solid var(--border)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:28px}
+.stat{padding:22px 20px}
+.stat .v{font-size:clamp(28px,3.6vw,40px);font-weight:700;letter-spacing:-.03em;line-height:1.05}
+.stat .r{font-size:15px;color:var(--text);margin-top:8px}
+.stat .c{font-size:13px;color:var(--text-3);margin-top:4px}
+.stat .c .melhor{color:var(--ok)}.stat .c .pior{color:var(--bad)}
+@media (max-width:900px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:480px){.stats{gap:10px}.stat{padding:16px 14px}}
+.aviso{padding:16px 20px;margin-top:20px;font-size:14px;line-height:1.5;color:var(--text-2)}
+.aviso b{color:var(--text)}
+.grafico{padding:20px 20px 12px;position:relative}
+.legenda{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--text-2);margin-bottom:8px}
+.legenda i{display:inline-block;width:14px;height:2px;border-radius:2px;vertical-align:4px;margin-right:6px}
+.grafico svg{display:block;width:100%;height:auto;overflow:visible}
+.grafico .grade{stroke:var(--border);stroke-width:1}
+.grafico .rot{fill:var(--text-3);font-size:11px}
+.grafico .rot-l{fill:var(--text-2);font-size:12px;font-weight:600}
+.grafico .l-hoje{stroke:var(--accent);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}
+.grafico .l-base{stroke:var(--text-3);stroke-width:2;fill:none;stroke-dasharray:5 4;stroke-linejoin:round}
+.grafico .p-hoje{fill:var(--accent);stroke:var(--surface);stroke-width:2}
+.grafico .mira{stroke:var(--border-2);stroke-width:1}
+.tabela{width:100%;border-collapse:collapse;font-size:14px}
+.tabela th{font-size:12px;font-weight:400;color:var(--text-3);text-align:left;padding:12px 16px;border-bottom:1px solid var(--border);white-space:nowrap}
+.tabela td{padding:11px 16px;border-bottom:1px solid var(--border);white-space:nowrap}
+.tabela tr:last-child td{border-bottom:0}
+.tabela .d{text-align:right}
+.tabela td.v-bom{color:var(--ok)}.tabela td.v-ruim{color:var(--bad)}
+.tabela tr.agora td{background:var(--accent-soft)}
+.tabela td.mudo{color:var(--text-3)}
+.rolagem{overflow-x:auto}
+#dica{position:fixed;z-index:50;pointer-events:none;background:var(--elevated);border:1px solid var(--border);box-shadow:var(--shadow-md);border-radius:var(--r-md);padding:8px 12px;font-size:13px;line-height:1.5;white-space:nowrap}
+.fim{margin:24px 0 64px;line-height:1.7}
+.vazio{padding:22px 20px;font-size:14px;color:var(--text-3)}
+</style>
+</head>
+<body>
+<main id="app" class="hidden">
+  <div class="wrap">
+    <section class="hero">
+      <div class="eyebrow" id="sobre">Ritmo do dia</div>
+      <h1 class="display" id="titulo">Carregando…</h1>
+      <p class="lede" id="resumo"></p>
+      <div class="controle seg" id="bases">
+        <button data-b="uteis">Últimos 5 dias úteis</button><button data-b="semana">Mesmo dia da semana</button>
+      </div>
+      <div id="avisos"></div>
+    </section>
+
+    <section class="bloco">
+      <div class="eyebrow">Até agora</div><h2 class="headline" id="h-ate">Hoje contra o normal.</h2>
+      <div class="stats" id="cards"></div>
+    </section>
+
+    <section class="bloco">
+      <div class="eyebrow">Curva</div><h2 class="headline">Impressões acumuladas ao longo do dia.</h2>
+      <div class="card grafico" style="margin-top:24px">
+        <div class="legenda" id="legenda"></div>
+        <div id="graf"></div>
+      </div>
+    </section>
+
+    <section class="bloco">
+      <div class="eyebrow">Hora a hora</div><h2 class="headline">Onde o dia ganhou ou perdeu.</h2>
+      <div class="card rolagem" style="margin-top:24px"><table class="tabela" id="horas"></table></div>
+    </section>
+
+    <section class="bloco">
+      <div class="eyebrow">Referência</div><h2 class="headline">Quanto cada dia costuma ter feito até cada hora.</h2>
+      <p class="lede">Impressões acumuladas, média das últimas 4 semanas em cada dia da semana.</p>
+      <div class="card rolagem" style="margin-top:24px"><table class="tabela" id="semana"></table></div>
+    </section>
+
+    <p class="caption fim">
+      Dados por hora do Google Ads, enviados de hora em hora pelo script <b>Elite Campinas - Curva por hora</b>.
+      <b>Últimos 5 dias úteis</b> = mesmo nível de verba de hoje; é a base certa para o dia a dia.
+      <b>Mesmo dia da semana</b> = média das últimas 4 semanas naquele dia; mostra o formato do mercado, mas mistura períodos com verba diferente.
+      A hora em andamento não entra na comparação, e o Google Ads pode levar até ~3h para consolidar a última hora fechada.
+    </p>
+  </div>
+</main>
+<div id="dica" class="hidden"></div>
+<script>
+const { $, esc, brl, int, guarda } = Painel;
+const NOMES = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+const NOMES_L = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+let sb, eu = {}, base = guarda.ler('ritmo-base', 'uteis'), ultimo = null;
+
+const iso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const dow = (s) => new Date(s + 'T12:00:00').getDay();
+const hh = (h) => String(h).padStart(2, '0') + ':59';
+const pctd = (v) => v == null || !isFinite(v) ? '—' : (v > 0 ? '+' : '') + Math.round(v * 100) + '%';
+const cls = (v) => v == null || !isFinite(v) ? '' : v >= 0.05 ? 'melhor' : v <= -0.05 ? 'pior' : '';
+const novoDia = () => Array.from({ length: 24 }, () => ({ i: 0, c: 0, cu: 0 }));
+const total = (dia) => dia.reduce((s, x) => s + x.i, 0);
+
+// média por hora (não acumulada) de uma lista de dias
+function media(dias, mapa, k) {
+  return Array.from({ length: 24 }, (_, h) => dias.length ? dias.reduce((s, d) => s + mapa[d][h][k], 0) / dias.length : 0);
+}
+const acum = (arr) => { let s = 0; return arr.map(v => (s += v)); };
+
+async function carregar() {
+  document.querySelectorAll('#bases button').forEach(b => b.classList.toggle('on', b.dataset.b === base));
+  const { data: r, error } = await sb.rpc('painel_ritmo', { p_loja: Painel.loja() });
+  if (error) { $('#titulo').textContent = 'Não consegui carregar.'; $('#resumo').textContent = error.message; return; }
+  ultimo = r; desenhar();
+}
+
+function desenhar() {
+  const r = ultimo || {}, linhas = r.linhas || [];
+  $('#sobre').textContent = 'Ritmo do dia · Google Ads' + ((eu.lojas || []).length > 1 ? ' · ' + Painel.lojaNome(eu) : '');
+  if (!linhas.length) {
+    $('#titulo').textContent = 'Ainda sem dado por hora.';
+    $('#resumo').textContent = '';
+    $('#avisos').innerHTML = '<div class="card aviso"><b>Essa loja ainda não manda dado por hora.</b> Hoje só a conta de Campinas (ELITECAR) tem o script <b>Elite Campinas - Curva por hora</b>. Os números aparecem aqui depois que ele rodar na conta da loja.</div>';
+    ['#cards', '#legenda', '#graf', '#horas', '#semana'].forEach(s => $(s).innerHTML = '');
+    return;
+  }
+  // mapa dia -> 24 horas
+  const mapa = {};
+  linhas.forEach(x => { (mapa[x.d] = mapa[x.d] || novoDia())[x.h] = { i: Number(x.i), c: Number(x.c), cu: Number(x.cu) }; });
+  const agora = new Date(), hoje = iso(agora), dsHoje = agora.getDay();
+  const upd = r.atualizado_em ? new Date(r.atualizado_em) : null;
+  // última hora fechada: a hora em andamento (e a do último envio) ainda está incompleta
+  const hUpd = upd && iso(upd) === hoje ? upd.getHours() : (upd && iso(upd) > hoje ? 24 : 0);
+  const fechada = Math.min(agora.getHours(), hUpd) - 1;
+  const dias = Object.keys(mapa).sort().reverse().filter(d => d < hoje && total(mapa[d]) > 0);
+  const uteis = dias.filter(d => dow(d) >= 1 && dow(d) <= 5).slice(0, 5);
+  const semana = dias.filter(d => dow(d) === dsHoje).slice(0, 4);
+  const usados = base === 'uteis' ? uteis : semana;
+  const rotBase = base === 'uteis' ? 'média dos últimos 5 dias úteis' : `média das últimas ${usados.length} ${NOMES_L[dsHoje]}s`;
+  const hd = mapa[hoje] || novoDia();
+  const bI = media(usados, mapa, 'i'), bC = media(usados, mapa, 'c'), bCu = media(usados, mapa, 'cu');
+  const aBI = acum(bI), aBC = acum(bC), aBCu = acum(bCu);
+  const aHI = acum(hd.map(x => x.i)), aHC = acum(hd.map(x => x.c)), aHCu = acum(hd.map(x => x.cu));
+  const totDia = aBI[23];
+
+  // janela de veiculação: horas com impressão na base ou hoje
+  const ativas = Array.from({ length: 24 }, (_, h) => h).filter(h => bI[h] > 0 || hd[h].i > 0);
+  const h0 = ativas.length ? ativas[0] : 6, h1 = ativas.length ? ativas[ativas.length - 1] : 19;
+
+  const avisos = [];
+  if (!usados.length) avisos.push('<b>Sem dias de referência para essa base.</b> Troque para a outra base acima.');
+  if (upd && (agora - upd) > 3 * 3600e3) avisos.push(`<b>Dado parado desde ${upd.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}.</b> O script do Google Ads pode ter falhado; confira em Ferramentas › Scripts.`);
+  $('#avisos').innerHTML = avisos.map(a => `<div class="card aviso">${a}</div>`).join('');
+
+  if (fechada < h0) {
+    $('#titulo').textContent = 'O dia ainda não começou.';
+    $('#resumo').textContent = `Os anúncios costumam rodar das ${h0}h às ${h1 + 1}h. Até o fim do dia, a ${rotBase} é de ${int(Math.round(totDia))} impressões e ${brl(aBCu[23])} de investimento.`;
+  } else {
+    const dI = aBI[fechada] ? aHI[fechada] / aBI[fechada] - 1 : null;
+    const dCu = aBCu[fechada] ? aHCu[fechada] / aBCu[fechada] - 1 : null;
+    const forma = dI == null ? 'sem referência' : Math.abs(dI) < 0.05 ? 'no ritmo normal' : `${Math.abs(Math.round(dI * 100))}% ${dI > 0 ? 'acima' : 'abaixo'} do normal`;
+    $('#titulo').textContent = `Até as ${hh(fechada)}, hoje está ${forma}.`;
+    $('#resumo').textContent = `${int(aHI[fechada])} impressões contra ${int(Math.round(aBI[fechada]))} na ${rotBase}. Investimento: ${brl(aHCu[fechada])} contra ${brl(aBCu[fechada])}`
+      + (dI != null && dCu != null && dCu - dI > 0.15 ? '. Gasto no ritmo com menos impressões: o leilão está mais caro hoje.' : '.');
+  }
+
+  // cards
+  const f = Math.max(fechada, -1);
+  const v = (arr) => f >= 0 ? arr[f] : 0;
+  const cpcH = v(aHC) ? v(aHCu) / v(aHC) : null, cpcB = v(aBC) ? v(aBCu) / v(aBC) : null;
+  const dif = (a, b) => b ? a / b - 1 : null;
+  const card = (val, rot, a, b, fmt, inverso) => { const d = dif(a, b), c = cls(inverso && d != null ? -d : d);
+    return `<div class="card stat"><div class="v num">${val}</div><div class="r">${rot}</div><div class="c">${b ? `<span class="${c}">${pctd(d)}</span> · base ${fmt(b)}` : 'sem base'}</div></div>`; };
+  $('#h-ate').textContent = f >= h0 ? `Hoje até as ${hh(f)}.` : 'Hoje contra o normal.';
+  $('#cards').innerHTML = [
+    card(int(v(aHI)), 'Impressões', v(aHI), v(aBI), x => int(Math.round(x))),
+    card(int(v(aHC)), 'Cliques', v(aHC), v(aBC), x => x.toLocaleString('pt-BR', { maximumFractionDigits: 1 })),
+    card(brl(v(aHCu)), 'Investimento', v(aHCu), v(aBCu), x => brl(x)),
+    card(cpcH == null ? '—' : brl(cpcH, 2), 'CPC médio', cpcH || 0, cpcB, x => brl(x, 2), true)
+  ].join('');
+
+  grafico(aHI, aBI, f, h0, h1, rotBase);
+
+  // tabela hora a hora
+  $('#horas').innerHTML = '<tr><th>Hora</th><th class="d">Impr. hoje</th><th class="d">Impr. base</th><th class="d">Acum. hoje</th><th class="d">Acum. base</th><th class="d">Diferença</th><th class="d">Invest. hoje (acum.)</th><th class="d">Invest. base (acum.)</th></tr>'
+    + Array.from({ length: h1 - h0 + 1 }, (_, k) => h0 + k).map(h => {
+      const fut = h > f, d = !fut && aBI[h] ? aHI[h] / aBI[h] - 1 : null, c = d == null ? '' : d >= 0.05 ? 'v-bom' : d <= -0.05 ? 'v-ruim' : '';
+      return `<tr class="${h === f + 1 && h <= h1 ? 'agora' : ''}"><td>${String(h).padStart(2, '0')}h${h === f + 1 ? ' <span class="caption">em andamento</span>' : ''}</td>
+        <td class="d num ${fut ? 'mudo' : ''}">${fut ? '—' : int(hd[h].i)}</td><td class="d num">${int(Math.round(bI[h]))}</td>
+        <td class="d num ${fut ? 'mudo' : ''}">${fut ? '—' : int(aHI[h])}</td><td class="d num">${int(Math.round(aBI[h]))}</td>
+        <td class="d num ${c}">${pctd(d)}</td>
+        <td class="d num ${fut ? 'mudo' : ''}">${fut ? '—' : brl(aHCu[h])}</td><td class="d num">${brl(aBCu[h])}</td></tr>`;
+    }).join('');
+
+  // referência por dia da semana
+  const curvas = NOMES.map((_, w) => acum(media(dias.filter(d => dow(d) === w).slice(0, 4), mapa, 'i')));
+  const marcos = [8, 10, 12, 14, 16, 18].filter(h => h >= h0 && h <= h1);
+  $('#semana').innerHTML = '<tr><th>Dia</th>' + marcos.map(h => `<th class="d">até ${hh(h)}</th>`).join('') + '<th class="d">Dia inteiro</th></tr>'
+    + [1, 2, 3, 4, 5, 6, 0].map(w => `<tr class="${w === dsHoje ? 'agora' : ''}"><td>${NOMES_L[w]}</td>${marcos.map(h => `<td class="d num">${curvas[w][23] ? int(Math.round(curvas[w][h])) : '—'}</td>`).join('')}<td class="d num">${curvas[w][23] ? int(Math.round(curvas[w][23])) : 'sem anúncio'}</td></tr>`).join('');
+}
+
+function grafico(aHI, aBI, f, h0, h1, rotBase) {
+  const caixa = $('#graf').clientWidth || 960, W = Math.max(320, caixa), H = W < 600 ? 220 : 300;
+  const ml = 44, mr = W < 600 ? 70 : 92, mt = 12, mb = 28;
+  const x0 = h0 - 1, x1 = h1;                       // eixo: fim da hora (h0-1 = início do dia de anúncio)
+  const maxV = Math.max(1, aBI[23], aHI[Math.max(f, 0)]);
+  const passo = [50, 100, 200, 250, 500, 1000].find(p => maxV / p <= 5) || 1000;
+  const topo = Math.ceil(maxV / passo) * passo;
+  const X = h => ml + (h - x0) / (x1 - x0) * (W - ml - mr), Y = v => mt + (1 - v / topo) * (H - mt - mb);
+  const pts = (arr, ate) => { const p = [[X(x0), Y(0)]]; for (let h = h0; h <= ate; h++) p.push([X(h), Y(arr[h])]); return p; };
+  const caminho = p => p.map((q, i) => (i ? 'L' : 'M') + q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join(' ');
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Impressões acumuladas por hora: hoje e ${esc(rotBase)}">`;
+  for (let v = 0; v <= topo; v += passo) s += `<line class="grade" x1="${ml}" x2="${W - mr}" y1="${Y(v)}" y2="${Y(v)}"/><text class="rot" x="${ml - 8}" y="${Y(v) + 4}" text-anchor="end">${int(v)}</text>`;
+  for (let h = h0; h <= h1; h += (W < 600 ? 3 : 2)) s += `<text class="rot" x="${X(h)}" y="${H - 8}" text-anchor="middle">${h}h</text>`;
+  const pb = pts(aBI, h1);
+  s += `<path class="l-base" d="${caminho(pb)}"/>`;
+  s += `<text class="rot-l" x="${X(h1) + 8}" y="${Y(aBI[h1]) + 4}">Base ${int(Math.round(aBI[h1]))}</text>`;
+  if (f >= h0) {
+    const ph = pts(aHI, Math.min(f, h1)), last = ph[ph.length - 1];
+    s += `<path class="l-hoje" d="${caminho(ph)}"/><circle class="p-hoje" cx="${last[0]}" cy="${last[1]}" r="5"/>`;
+    const abaixo = aHI[Math.min(f, h1)] < aBI[Math.min(f, h1)];
+    s += `<text class="rot-l" x="${last[0] + 10}" y="${last[1] + (abaixo ? 18 : -8)}">Hoje ${int(aHI[Math.min(f, h1)])}</text>`;
+  }
+  s += `<line class="mira hidden" id="mira" y1="${mt}" y2="${H - mb}"/><rect id="alvo" x="${ml}" y="${mt}" width="${W - ml - mr}" height="${H - mt - mb}" fill="transparent"/></svg>`;
+  $('#legenda').innerHTML = `<span><i style="background:var(--accent)"></i>Hoje</span><span><i style="background:repeating-linear-gradient(90deg,var(--text-3) 0 5px,transparent 5px 9px)"></i>${esc(rotBase[0].toUpperCase() + rotBase.slice(1))}</span>`;
+  $('#graf').innerHTML = s;
+  const svg = $('#graf svg'), mira = $('#mira'), dica = $('#dica');
+  const mover = (e) => {
+    const b = svg.getBoundingClientRect(), xv = (e.clientX - b.left) / b.width * W;
+    const h = Math.max(h0, Math.min(h1, Math.round(x0 + (xv - ml) / (W - ml - mr) * (x1 - x0))));
+    mira.setAttribute('x1', X(h)); mira.setAttribute('x2', X(h)); mira.classList.remove('hidden');
+    dica.innerHTML = `<b>Até as ${hh(h)}</b><br>Hoje: ${h <= f ? int(aHI[h]) : '—'}<br>Base: ${int(Math.round(aBI[h]))}`;
+    dica.style.left = Math.min(e.clientX + 14, innerWidth - dica.offsetWidth - 10) + 'px'; dica.style.top = (e.clientY + 14) + 'px'; dica.classList.remove('hidden');
+  };
+  $('#alvo').addEventListener('mousemove', mover);
+  $('#alvo').addEventListener('mouseleave', () => { mira.classList.add('hidden'); dica.classList.add('hidden'); });
+}
+
+Painel.iniciar('ritmo', (cliente, quem) => {
+  sb = cliente; eu = quem || {};
+  Painel.quandoTrocarLoja(() => carregar());
+  $('#bases').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { base = b.dataset.b; guarda.gravar('ritmo-base', base); document.querySelectorAll('#bases button').forEach(x => x.classList.toggle('on', x === b)); desenhar(); } });
+  carregar();
+  setInterval(carregar, 10 * 60e3);   // recarrega a cada 10 min
+  let t; addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => ultimo && desenhar(), 200); });
+});
+</script>
+</body>
+</html>

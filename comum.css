@@ -124,7 +124,7 @@ label.l{display:block;font-size:13px;color:var(--text-2);margin:14px 0 6px}
 .p-enviada{background:var(--ok-soft);color:var(--ok)}
 .p-fila{background:var(--info-soft);color:var(--info)}
 .p-recusada{background:var(--bad-soft);color:var(--bad)}
-@media (max-width:480px){.nav .marca{display:none}.nav .wrap{gap:8px}.nav .seg a{padding:0 10px}.nav .seg{margin-right:auto}}
+@media (max-width:480px){.nav .marca{display:none}.nav .wrap{gap:8px}.nav .seg a{padding:0 8px;font-size:12.5px}.nav .seg{margin-right:auto}}
 .sug.perda{background:var(--bad-soft);border-color:color-mix(in srgb,var(--bad) 30%,transparent)}
 .sug.perda.desq{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 30%,transparent)}
 .sug.desq .btn.perdido{background:var(--warn-soft);color:var(--warn)}

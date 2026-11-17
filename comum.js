@@ -85,11 +85,12 @@
 
   function nav(pagina, nome) {
     return `<header class="nav"><div class="wrap">
-      <div class="marca"><b>${esc(MARCA)}</b><span> · ${({ crm: 'Comercial', relatorio: 'Relatório ao vivo', campanhas: 'Google Ads', ligacoes: 'Ligações' })[pagina] || ''}</span></div>
+      <div class="marca"><b>${esc(MARCA)}</b><span> · ${({ crm: 'Comercial', relatorio: 'Relatório ao vivo', campanhas: 'Google Ads', ritmo: 'Ritmo do dia', ligacoes: 'Ligações' })[pagina] || ''}</span></div>
       <nav class="seg" aria-label="Seções">
         <a href="index.html" class="${pagina === 'crm' ? 'on' : ''}">CRM</a>
         <a href="ligacoes.html" class="${pagina === 'ligacoes' ? 'on' : ''}">Ligações</a>
         <a href="campanhas.html" class="${pagina === 'campanhas' ? 'on' : ''}">Campanhas</a>
+        <a href="ritmo.html" class="${pagina === 'ritmo' ? 'on' : ''}">Ritmo</a>
         <a href="relatorio.html" class="${pagina === 'relatorio' ? 'on' : ''}">Relatório</a>
       </nav>
       <button class="sair" id="b-sair" title="${esc(nome || '')}">Sair</button>
