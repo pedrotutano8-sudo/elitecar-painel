@@ -89,7 +89,7 @@ section.bloco{padding:56px 0;border-top:1px solid var(--border)}
       Dados por hora do Google Ads, enviados de hora em hora pelo script <b>Elite Campinas - Curva por hora</b>.
       <b>Últimos 5 dias úteis</b> = mesmo nível de verba de hoje; é a base certa para o dia a dia.
       <b>Mesmo dia da semana</b> = média das últimas 4 semanas naquele dia; mostra o formato do mercado, mas mistura períodos com verba diferente.
-      A hora em andamento não entra na comparação, e o Google Ads pode levar até ~3h para consolidar a última hora fechada.
+      Os números somam o dia desde a primeira hora até a última hora fechada, e comparam com a base somada até a mesma hora. A hora em andamento não entra, e a última hora fechada ainda pode subir: o Google Ads leva até ~3h para consolidar.
     </p>
   </div>
 </main>
@@ -167,8 +167,16 @@ function desenhar() {
     const dCu = aBCu[fechada] ? aHCu[fechada] / aBCu[fechada] - 1 : null;
     const forma = dI == null ? 'sem referência' : Math.abs(dI) < 0.05 ? 'no ritmo normal' : `${Math.abs(Math.round(dI * 100))}% ${dI > 0 ? 'acima' : 'abaixo'} do normal`;
     $('#titulo').textContent = `Até as ${hh(fechada)}, hoje está ${forma}.`;
-    $('#resumo').textContent = `${int(aHI[fechada])} impressões contra ${int(Math.round(aBI[fechada]))} na ${rotBase}. Investimento: ${brl(aHCu[fechada])} contra ${brl(aBCu[fechada])}`
-      + (dI != null && dCu != null && dCu - dI > 0.15 ? '. Gasto no ritmo com menos impressões: o leilão está mais caro hoje.' : '.');
+    let extra = '';
+    if (dI != null && dCu != null && dCu - dI > 0.15)
+      extra += ` Gastando ${dCu > 0.05 ? Math.round(dCu * 100) + '% mais' : 'o mesmo'} com ${dI < -0.05 ? Math.abs(Math.round(dI * 100)) + '% menos' : 'as mesmas'} impressões: cada clique está saindo mais caro hoje.`;
+    // projeção: se o gasto seguir nesse ritmo, quando a verba média do dia acaba
+    const ritmo = aBCu[fechada] ? aHCu[fechada] / aBCu[fechada] : null, verba = aBCu[23];
+    if (ritmo && ritmo > 1.1 && verba) {
+      const hFim = aBCu.findIndex(v => v * ritmo >= verba);
+      if (hFim >= 0 && hFim < h1) extra += ` Nesse ritmo, a verba de um dia normal (${brl(verba)}) acaba por volta das ${hFim + 1}h.`;
+    }
+    $('#resumo').textContent = `${int(aHI[fechada])} impressões contra ${int(Math.round(aBI[fechada]))} na ${rotBase}. Investimento: ${brl(aHCu[fechada])} contra ${brl(aBCu[fechada])}.` + extra;
   }
 
   // cards
